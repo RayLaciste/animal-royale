@@ -45,6 +45,9 @@ public class MyGame extends VariableFrameRateGame {
 	private ObjShape planeS;
 	private TextureImage groundTx;
 
+	// skybox
+	private int flufflyClouds;
+
 	private String serverAddress;
 	private int serverPort;
 	private ProtocolType serverProtocol;
@@ -91,6 +94,13 @@ public class MyGame extends VariableFrameRateGame {
 	}
 
 	@Override
+	public void loadSkyBoxes() {
+		flufflyClouds = (engine.getSceneGraph()).loadCubeMap("fluffyClouds");
+		(engine.getSceneGraph()).setActiveSkyBoxTexture(flufflyClouds);
+		(engine.getSceneGraph()).setSkyBoxEnabled(true);
+	}
+
+	@Override
 	public void buildObjects() {
 		Matrix4f initialTranslation, initialRotation, initialScale;
 
@@ -110,7 +120,7 @@ public class MyGame extends VariableFrameRateGame {
 		
 		// Ground
 		ground = new GameObject(GameObject.root(), planeS, groundTx);
-		initialTranslation = (new Matrix4f()).translation(0, -0.5f, 0);
+		initialTranslation = (new Matrix4f()).translation(0, 0, 0);
 		ground.setLocalTranslation(initialTranslation);
 		initialScale = (new Matrix4f()).scaling(20.0f);
 		ground.setLocalScale(initialScale);
@@ -129,7 +139,7 @@ public class MyGame extends VariableFrameRateGame {
 	public void initializeLights() {
 		Light.setGlobalAmbient(.5f, .5f, .5f);
 
-		light = new Light();
+		light = new Light(); 
 		light.setLocation(new Vector3f(0f, 5f, 0f));
 		(engine.getSceneGraph()).addLight(light);
 	}
