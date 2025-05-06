@@ -41,9 +41,9 @@ public class MyGame extends VariableFrameRateGame {
 	private Light light;
 
 	// ground
-	private GameObject ground;
-	private ObjShape planeS;
-	private TextureImage groundTx;
+	private GameObject terr;
+	private ObjShape terrS;
+	private TextureImage groundTx, heightMapTx;
 
 	// skybox
 	private int flufflyClouds;
@@ -90,8 +90,8 @@ public class MyGame extends VariableFrameRateGame {
 		ghostS = new Sphere();
 		dolS = new ImportedModel("dolphinHighPoly.obj");
 
-		// ground
-		planeS = new Plane();
+		// terrain
+		terrS = new TerrainPlane(1000);
 
 		// npc
 		npcShape = new ImportedModel("frog.obj");
@@ -105,8 +105,9 @@ public class MyGame extends VariableFrameRateGame {
 	public void loadTextures() {
 		doltx = new TextureImage("Dolphin_HighPolyUV.png");
 		ghostT = new TextureImage("redDolphin.jpg");
-		groundTx = new TextureImage("water.jpg");
+		groundTx = new TextureImage("grass.png");
 		npcTex = new TextureImage("frog.png");
+		heightMapTx = new TextureImage("terrain.png");
 	}
 
 	@Override
@@ -126,6 +127,8 @@ public class MyGame extends VariableFrameRateGame {
 		avatar.setLocalTranslation(initialTranslation);
 		initialRotation = (new Matrix4f()).rotationY((float) java.lang.Math.toRadians(135.0f));
 		avatar.setLocalRotation(initialRotation);
+		initialScale = (new Matrix4f()).scaling(0.5f);
+		avatar.setLocalScale(initialScale);
 
 		// build torus along X axis
 		tor = new GameObject(GameObject.root(), torS);
@@ -135,12 +138,16 @@ public class MyGame extends VariableFrameRateGame {
 		tor.setLocalScale(initialScale);
 
 		// Ground
-		ground = new GameObject(GameObject.root(), planeS, groundTx);
-		initialTranslation = (new Matrix4f()).translation(0, 0, 0);
-		ground.setLocalTranslation(initialTranslation);
-		initialScale = (new Matrix4f()).scaling(20.0f);
-		ground.setLocalScale(initialScale);
-		ground.getRenderStates().setTiling(4);
+		terr = new GameObject(GameObject.root(), terrS, groundTx);
+		initialTranslation = (new Matrix4f()).translation(0f, 0f, 0f);
+		terr.setLocalTranslation(initialTranslation);
+		initialScale = (new Matrix4f()).scaling(20.0f, 1.0f, 20.0f);
+		terr.setLocalScale(initialScale);
+		terr.setHeightMap(heightMapTx);
+
+		// Set tiling for terrain texture
+		terr.getRenderStates().setTiling(1);
+		terr.getRenderStates().setTileFactor(10);
 
 		// add X,Y,-Z axes
 		x = new GameObject(GameObject.root(), linxS);
@@ -235,6 +242,10 @@ public class MyGame extends VariableFrameRateGame {
 		if (jumpAction != null) {
 			jumpAction.update();
 		}
+
+		Vector3f loc = avatar.getWorldLocation();
+		float height = terr.getHeight(loc.x(), loc.z());
+		avatar.setLocalLocation(new Vector3f(loc.x(), height, loc.z()));
 
 		positionCameraBehindAvatar();
 		processNetworking((float) elapsedTime);
