@@ -48,6 +48,18 @@ public class MyGame extends VariableFrameRateGame {
 	// skybox
 	private int flufflyClouds;
 
+	// npcs
+	private ObjShape npcShape;
+	private TextureImage npcTex;
+
+	public ObjShape getNPCshape() {
+		return npcShape;
+	}
+
+	public TextureImage getNPCtexture() {
+		return npcTex;
+	}
+
 	private String serverAddress;
 	private int serverPort;
 	private ProtocolType serverProtocol;
@@ -77,9 +89,12 @@ public class MyGame extends VariableFrameRateGame {
 		torS = new Torus(0.5f, 0.2f, 48);
 		ghostS = new Sphere();
 		dolS = new ImportedModel("dolphinHighPoly.obj");
-		
+
 		// ground
 		planeS = new Plane();
+
+		// npc
+		npcShape = new ImportedModel("frog.obj");
 
 		linxS = new Line(new Vector3f(0f, 0f, 0f), new Vector3f(3f, 0f, 0f));
 		linyS = new Line(new Vector3f(0f, 0f, 0f), new Vector3f(0f, 3f, 0f));
@@ -91,6 +106,7 @@ public class MyGame extends VariableFrameRateGame {
 		doltx = new TextureImage("Dolphin_HighPolyUV.png");
 		ghostT = new TextureImage("redDolphin.jpg");
 		groundTx = new TextureImage("water.jpg");
+		npcTex = new TextureImage("frog.png");
 	}
 
 	@Override
@@ -117,7 +133,7 @@ public class MyGame extends VariableFrameRateGame {
 		tor.setLocalTranslation(initialTranslation);
 		initialScale = (new Matrix4f()).scaling(0.25f);
 		tor.setLocalScale(initialScale);
-		
+
 		// Ground
 		ground = new GameObject(GameObject.root(), planeS, groundTx);
 		initialTranslation = (new Matrix4f()).translation(0, 0, 0);
@@ -125,7 +141,7 @@ public class MyGame extends VariableFrameRateGame {
 		initialScale = (new Matrix4f()).scaling(20.0f);
 		ground.setLocalScale(initialScale);
 		ground.getRenderStates().setTiling(4);
-		
+
 		// add X,Y,-Z axes
 		x = new GameObject(GameObject.root(), linxS);
 		y = new GameObject(GameObject.root(), linyS);
@@ -139,7 +155,7 @@ public class MyGame extends VariableFrameRateGame {
 	public void initializeLights() {
 		Light.setGlobalAmbient(.5f, .5f, .5f);
 
-		light = new Light(); 
+		light = new Light();
 		light.setLocation(new Vector3f(0f, 5f, 0f));
 		(engine.getSceneGraph()).addLight(light);
 	}
