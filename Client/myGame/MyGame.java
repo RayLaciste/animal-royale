@@ -24,6 +24,8 @@ import net.java.games.input.Component.Identifier.*;
 import tage.networking.IGameConnection.ProtocolType;
 
 public class MyGame extends VariableFrameRateGame {
+	JumpAction jumpAction;
+
 	private static Engine engine;
 	private InputManager im;
 	private GhostManager gm;
@@ -37,6 +39,11 @@ public class MyGame extends VariableFrameRateGame {
 	private ObjShape torS, ghostS, dolS, linxS, linyS, linzS;
 	private TextureImage doltx, ghostT;
 	private Light light;
+
+	// ground
+	private GameObject ground;
+	private ObjShape planeS;
+	private TextureImage groundTx;
 
 	private String serverAddress;
 	private int serverPort;
@@ -67,6 +74,10 @@ public class MyGame extends VariableFrameRateGame {
 		torS = new Torus(0.5f, 0.2f, 48);
 		ghostS = new Sphere();
 		dolS = new ImportedModel("dolphinHighPoly.obj");
+		
+		// ground
+		planeS = new Plane();
+
 		linxS = new Line(new Vector3f(0f, 0f, 0f), new Vector3f(3f, 0f, 0f));
 		linyS = new Line(new Vector3f(0f, 0f, 0f), new Vector3f(0f, 3f, 0f));
 		linzS = new Line(new Vector3f(0f, 0f, 0f), new Vector3f(0f, 0f, -3f));
@@ -76,6 +87,7 @@ public class MyGame extends VariableFrameRateGame {
 	public void loadTextures() {
 		doltx = new TextureImage("Dolphin_HighPolyUV.png");
 		ghostT = new TextureImage("redDolphin.jpg");
+		groundTx = new TextureImage("water.jpg");
 	}
 
 	@Override
@@ -95,7 +107,15 @@ public class MyGame extends VariableFrameRateGame {
 		tor.setLocalTranslation(initialTranslation);
 		initialScale = (new Matrix4f()).scaling(0.25f);
 		tor.setLocalScale(initialScale);
-
+		
+		// Ground
+		ground = new GameObject(GameObject.root(), planeS, groundTx);
+		initialTranslation = (new Matrix4f()).translation(0, -0.5f, 0);
+		ground.setLocalTranslation(initialTranslation);
+		initialScale = (new Matrix4f()).scaling(20.0f);
+		ground.setLocalScale(initialScale);
+		ground.getRenderStates().setTiling(4);
+		
 		// add X,Y,-Z axes
 		x = new GameObject(GameObject.root(), linxS);
 		y = new GameObject(GameObject.root(), linyS);
@@ -132,6 +152,7 @@ public class MyGame extends VariableFrameRateGame {
 		FwdAction fwdAction = new FwdAction(this, protClient);
 		TurnAction turnAction = new TurnAction(this, protClient);
 		BackwardAction backwardAction = new BackwardAction(this, protClient);
+		jumpAction = new JumpAction(this, protClient);
 
 		// attach the action objects to keyboard and gamepad components
 		im.associateActionWithAllGamepads(
@@ -152,6 +173,9 @@ public class MyGame extends VariableFrameRateGame {
 		im.associateActionWithAllKeyboards(
 				net.java.games.input.Component.Identifier.Key.D,
 				turnAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+		im.associateActionWithAllKeyboards(
+				net.java.games.input.Component.Identifier.Key.SPACE,
+				jumpAction, InputManager.INPUT_ACTION_TYPE.ON_PRESS_ONLY);
 	}
 
 	public GameObject getAvatar() {
@@ -181,6 +205,11 @@ public class MyGame extends VariableFrameRateGame {
 
 		// update inputs and camera
 		im.update((float) elapsedTime);
+
+		if (jumpAction != null) {
+			jumpAction.update();
+		}
+
 		positionCameraBehindAvatar();
 		processNetworking((float) elapsedTime);
 	}
