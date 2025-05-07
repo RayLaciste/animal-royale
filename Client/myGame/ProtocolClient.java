@@ -118,6 +118,44 @@ public class ProtocolClient extends GameConnectionClient {
 				}
 				ghostManager.updateGhostRotation(ghostID, rotation);
 			}
+
+			// ^ BALLS
+			
+			// Handle createBall messages
+			if (messageTokens[0].compareTo("createBall") == 0) {
+				// Format: createBall, senderId, ballId, x, y, z
+				UUID senderId = UUID.fromString(messageTokens[1]);
+				UUID ballId = UUID.fromString(messageTokens[2]);
+				Vector3f ballPosition = new Vector3f(
+						Float.parseFloat(messageTokens[3]),
+						Float.parseFloat(messageTokens[4]),
+						Float.parseFloat(messageTokens[5]));
+
+				try {
+					ghostManager.createGhostBall(ballId, senderId, ballPosition);
+				} catch (IOException e) {
+					System.out.println("Error creating ghost ball");
+				}
+			}
+
+			// Handle moveBall messages
+			if (messageTokens[0].compareTo("moveBall") == 0) {
+				// Format: moveBall, senderId, ballId, x, y, z
+				UUID ballId = UUID.fromString(messageTokens[2]);
+				Vector3f ballPosition = new Vector3f(
+						Float.parseFloat(messageTokens[3]),
+						Float.parseFloat(messageTokens[4]),
+						Float.parseFloat(messageTokens[5]));
+
+				ghostManager.updateGhostBall(ballId, ballPosition);
+			}
+
+			// Handle removeBall messages
+			if (messageTokens[0].compareTo("removeBall") == 0) {
+				// Format: removeBall, senderId, ballId
+				UUID ballId = UUID.fromString(messageTokens[2]);
+				ghostManager.removeGhostBall(ballId);
+			}
 		}
 	}
 
@@ -209,6 +247,39 @@ public class ProtocolClient extends GameConnectionClient {
 			for (int i = 0; i < 16; i++) {
 				message += "," + rotation.get(i / 4, i % 4);
 			}
+			sendPacket(message);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	// ^ balls
+	// Send a message to create a ball
+	public void sendCreateBallMessage(UUID ballId, Vector3f position) {
+		try {
+			String message = new String("createBall," + id.toString() + "," + ballId.toString());
+			message += "," + position.x() + "," + position.y() + "," + position.z();
+			sendPacket(message);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	// Send a message to update ball position
+	public void sendUpdateBallMessage(UUID ballId, Vector3f position) {
+		try {
+			String message = new String("moveBall," + id.toString() + "," + ballId.toString());
+			message += "," + position.x() + "," + position.y() + "," + position.z();
+			sendPacket(message);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	// Send a message to remove a ball
+	public void sendRemoveBallMessage(UUID ballId) {
+		try {
+			String message = new String("removeBall," + id.toString() + "," + ballId.toString());
 			sendPacket(message);
 		} catch (IOException e) {
 			e.printStackTrace();

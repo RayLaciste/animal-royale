@@ -80,6 +80,14 @@ public class MyGame extends VariableFrameRateGame {
 	private PhysicsObject sphereP;
 	private boolean sphereCreated = false;
 
+	public ObjShape getSphereShape() {
+		return sphereS;
+	}
+
+	public TextureImage getSphereTexture() {
+		return sphereTx;
+	}
+
 	private String serverAddress;
 	private int serverPort;
 	private ProtocolType serverProtocol;
@@ -285,6 +293,15 @@ public class MyGame extends VariableFrameRateGame {
 
 		if (sphereCreated) {
 			checkSphereLifetime();
+
+			if (sphere != null && protClient != null && isClientConnected && sphereId != null) {
+				protClient.sendUpdateBallMessage(sphereId, sphere.getWorldLocation());
+			}
+
+		}
+
+		if (gm != null) {
+			gm.cleanupExpiredBalls(SPHERE_LIFETIME);
 		}
 
 		// Update physics
@@ -373,6 +390,7 @@ public class MyGame extends VariableFrameRateGame {
 	// * ---------- Physics throw SECTION ----------------
 	private long sphereCreationTime = 0;
 	private final long SPHERE_LIFETIME = 2500; // 2.5 seconds
+	private UUID sphereId = null;
 
 	private void createThrowableSphere() {
 		if (sphereCreated) {
@@ -382,14 +400,16 @@ public class MyGame extends VariableFrameRateGame {
 				physicsEngine.removeObject(physicsObjectUID);
 				sphere.setPhysicsObject(null);
 			}
-			if (sphere != null) {
-				engine.getSceneGraph().removeGameObject(sphere);
+			if (sphereId != null && protClient != null && isClientConnected) {
+				protClient.sendRemoveBallMessage(sphereId);
+				sphereId = null;
 			}
 			sphereCreated = false;
 		}
 
 		// Create a new sphere
 		sphere = new GameObject(GameObject.root(), sphereS, sphereTx);
+		sphereId = UUID.randomUUID();
 
 		// Get avatar position and direction
 		Vector3f avatarPos = avatar.getWorldLocation();
@@ -439,6 +459,10 @@ public class MyGame extends VariableFrameRateGame {
 
 		float[] initialVelocity = { tossDir.x() * 2.5f, tossDir.y() * 2.5f, tossDir.z() * 2.5f };
 		sphereP.setLinearVelocity(initialVelocity);
+
+		if (protClient != null && isClientConnected) {
+			protClient.sendCreateBallMessage(sphereId, sphere.getWorldLocation());
+		}
 
 		// Start tracking the sphere's lifetime
 		sphereCreationTime = System.currentTimeMillis();

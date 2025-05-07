@@ -77,6 +77,37 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 				}
 				sendRotateMessages(clientID, rotMatrix);
 			}
+
+			// ^ BALLS
+
+			// Handle createBall messages
+			if (messageTokens[0].compareTo("createBall") == 0) {
+				// Format: createBall, senderId, ballId, x, y, z
+				UUID clientID = UUID.fromString(messageTokens[1]);
+				UUID ballID = UUID.fromString(messageTokens[2]);
+				String[] pos = { messageTokens[3], messageTokens[4], messageTokens[5] };
+
+				sendCreateBallMessages(clientID, ballID, pos);
+			}
+
+			// Handle moveBall messages
+			if (messageTokens[0].compareTo("moveBall") == 0) {
+				// Format: moveBall, senderId, ballId, x, y, z
+				UUID clientID = UUID.fromString(messageTokens[1]);
+				UUID ballID = UUID.fromString(messageTokens[2]);
+				String[] pos = { messageTokens[3], messageTokens[4], messageTokens[5] };
+
+				sendMoveBallMessages(clientID, ballID, pos);
+			}
+
+			// Handle removeBall messages
+			if (messageTokens[0].compareTo("removeBall") == 0) {
+				// Format: removeBall, senderId, ballId
+				UUID clientID = UUID.fromString(messageTokens[1]);
+				UUID ballID = UUID.fromString(messageTokens[2]);
+
+				sendRemoveBallMessages(clientID, ballID);
+			}
 		}
 	}
 
@@ -204,6 +235,43 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 			for (int i = 0; i < 16; i++) {
 				message += "," + rotMatrix[i];
 			}
+			forwardPacketToAll(message, clientID);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	// ^ BALLS
+
+	public void sendCreateBallMessages(UUID clientID, UUID ballID, String[] position) {
+		try {
+			String message = new String("createBall," + clientID.toString() + "," + ballID.toString());
+			message += "," + position[0];
+			message += "," + position[1];
+			message += "," + position[2];
+
+			forwardPacketToAll(message, clientID);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void sendMoveBallMessages(UUID clientID, UUID ballID, String[] position) {
+		try {
+			String message = new String("moveBall," + clientID.toString() + "," + ballID.toString());
+			message += "," + position[0];
+			message += "," + position[1];
+			message += "," + position[2];
+
+			forwardPacketToAll(message, clientID);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void sendRemoveBallMessages(UUID clientID, UUID ballID) {
+		try {
+			String message = new String("removeBall," + clientID.toString() + "," + ballID.toString());
 			forwardPacketToAll(message, clientID);
 		} catch (IOException e) {
 			e.printStackTrace();

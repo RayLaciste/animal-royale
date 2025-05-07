@@ -13,9 +13,58 @@ import tage.*;
 public class GhostManager {
 	private MyGame game;
 	private Vector<GhostAvatar> ghostAvatars = new Vector<GhostAvatar>();
+	private Vector<GhostBall> ghostBalls = new Vector<GhostBall>();
 
 	public GhostManager(VariableFrameRateGame vfrg) {
 		game = (MyGame) vfrg;
+	}
+
+	public void createGhostBall(UUID ballId, UUID ownerId, Vector3f position) throws IOException {
+		ObjShape s = game.getSphereShape();
+		TextureImage t = game.getSphereTexture();
+
+		GhostBall newBall = new GhostBall(ballId, ownerId, s, t, position);
+		ghostBalls.add(newBall);
+	}
+
+	public void removeGhostBall(UUID ballId) {
+		GhostBall ghostBall = findBall(ballId);
+		if (ghostBall != null) {
+			game.getEngine().getSceneGraph().removeGameObject(ghostBall);
+			ghostBalls.remove(ghostBall);
+		}
+	}
+
+	public void updateGhostBall(UUID ballId, Vector3f position) {
+		GhostBall ghostBall = findBall(ballId);
+		if (ghostBall != null) {
+			ghostBall.setPosition(position);
+		}
+	}
+
+	private GhostBall findBall(UUID ballId) {
+		Iterator<GhostBall> it = ghostBalls.iterator();
+		while (it.hasNext()) {
+			GhostBall ghostBall = it.next();
+			if (ghostBall.getID().compareTo(ballId) == 0) {
+				return ghostBall;
+			}
+		}
+		return null;
+	}
+
+	// Add method to clean up expired ghost balls
+	public void cleanupExpiredBalls(long maxLifetime) {
+		long currentTime = System.currentTimeMillis();
+		Iterator<GhostBall> it = ghostBalls.iterator();
+
+		while (it.hasNext()) {
+			GhostBall ball = it.next();
+			if (currentTime - ball.getCreationTime() > maxLifetime) {
+				game.getEngine().getSceneGraph().removeGameObject(ball);
+				it.remove();
+			}
+		}
 	}
 
 	public void createGhostAvatar(UUID id, Vector3f position) throws IOException {
