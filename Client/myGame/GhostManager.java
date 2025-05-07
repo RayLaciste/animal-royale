@@ -19,6 +19,10 @@ public class GhostManager {
 		game = (MyGame) vfrg;
 	}
 
+	public Vector<GhostBall> getGhostBalls() {
+		return ghostBalls;
+	}
+	
 	public void createGhostBall(UUID ballId, UUID ownerId, Vector3f position) throws IOException {
 		ObjShape s = game.getSphereShape();
 		TextureImage t = game.getSphereTexture();

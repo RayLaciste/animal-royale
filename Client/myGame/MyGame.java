@@ -80,6 +80,12 @@ public class MyGame extends VariableFrameRateGame {
 	private PhysicsObject sphereP;
 	private boolean sphereCreated = false;
 
+	// player stuff
+	private int playerHealth = 3; // Start with 3 health
+	private boolean isInvulnerable = false;
+	private long invulnerabilityStartTime = 0;
+	private final long INVULNERABILITY_DURATION = 1000;
+
 	public ObjShape getSphereShape() {
 		return sphereS;
 	}
@@ -270,19 +276,28 @@ public class MyGame extends VariableFrameRateGame {
 		amt = elapsedTime * 0.03;
 		Camera c = (engine.getRenderSystem()).getViewport("MAIN").getCamera();
 
-		// build and set HUD
-		int elapsTimeSec = Math.round((float) (System.currentTimeMillis() - startTime) / 1000.0f);
-		String elapsTimeStr = Integer.toString(elapsTimeSec);
-		String counterStr = Integer.toString(counter);
-		String dispStr1 = "Time = " + elapsTimeStr;
-		String dispStr2 = "camera position = "
-				+ (c.getLocation()).x()
-				+ ", " + (c.getLocation()).y()
-				+ ", " + (c.getLocation()).z();
+		// Check if invulnerability period is over
+		if (isInvulnerable && System.currentTimeMillis() - invulnerabilityStartTime > INVULNERABILITY_DURATION) {
+			isInvulnerable = false;
+		}
+
+		// Calculate cooldown percentage for ball throws
+		long currentTime = System.currentTimeMillis();
+		float cooldownRemaining = 0;
+		if (currentTime - lastBallThrowTime < BALL_THROW_COOLDOWN) {
+			cooldownRemaining = (BALL_THROW_COOLDOWN - (currentTime - lastBallThrowTime)) / 1000.0f;
+		}
+
+		// Build and set HUD to show health
+		String healthStr = "Health: " + playerHealth;
+
+		String throwStatus = cooldownRemaining > 0 ? "Throw cooldown: " + String.format("%.1f", cooldownRemaining) + "s"
+				: "Ready to throw!";
+
 		Vector3f hud1Color = new Vector3f(1, 0, 0);
 		Vector3f hud2Color = new Vector3f(1, 1, 1);
-		(engine.getHUDmanager()).setHUD1(dispStr1, hud1Color, 15, 15);
-		(engine.getHUDmanager()).setHUD2(dispStr2, hud2Color, 500, 15);
+		(engine.getHUDmanager()).setHUD1(healthStr, hud1Color, 15, 15);
+		(engine.getHUDmanager()).setHUD2(throwStatus, hud2Color, 500, 15);
 
 		// update inputs and camera
 		im.update((float) elapsedTime);
@@ -291,6 +306,8 @@ public class MyGame extends VariableFrameRateGame {
 			jumpAction.update();
 		}
 
+		checkPlayerHits();
+		checkBallBoundary();
 		if (sphereCreated) {
 			checkSphereLifetime();
 
@@ -361,13 +378,22 @@ public class MyGame extends VariableFrameRateGame {
 	public void keyPressed(KeyEvent e) {
 		switch (e.getKeyCode()) {
 			case KeyEvent.VK_R: {
-				// Create and throw a sphere when R is pressed
-				createThrowableSphere();
+				long currentTime = System.currentTimeMillis();
+				// Check if cooldown has passed
+				if (currentTime - lastBallThrowTime > BALL_THROW_COOLDOWN) {
+					// Create and throw a sphere when R is pressed
+					createThrowableSphere();
+					lastBallThrowTime = currentTime; // Update the last throw time
 
-				// Start physics if not already running
-				if (!running) {
-					running = true;
-					System.out.println("starting physics");
+					// Start physics if not already running
+					if (!running) {
+						running = true;
+						System.out.println("starting physics");
+					}
+				} else {
+					// Calculate remaining cooldown time in seconds
+					float remainingCooldown = (BALL_THROW_COOLDOWN - (currentTime - lastBallThrowTime)) / 1000.0f;
+					System.out.println("Throw on cooldown! Ready in " + remainingCooldown + " seconds");
 				}
 				break;
 			}
@@ -391,6 +417,8 @@ public class MyGame extends VariableFrameRateGame {
 	private long sphereCreationTime = 0;
 	private final long SPHERE_LIFETIME = 2500; // 2.5 seconds
 	private UUID sphereId = null;
+	private long lastBallThrowTime = 0;
+	private final long BALL_THROW_COOLDOWN = 1500;
 
 	private void createThrowableSphere() {
 		if (sphereCreated) {
@@ -482,22 +510,98 @@ public class MyGame extends VariableFrameRateGame {
 	private void removeSphere() {
 		if (sphereCreated) {
 			// Remove from physics engine
-			if (sphere.getPhysicsObject() != null) {
-				int physicsObjectUID = sphere.getPhysicsObject().getUID();
-				physicsEngine.removeObject(physicsObjectUID);
-				sphere.setPhysicsObject(null);
+			if (sphere != null && sphere.getPhysicsObject() != null) {
+				try {
+					int physicsObjectUID = sphere.getPhysicsObject().getUID();
+					System.out.println("Removing physics object with UID: " + physicsObjectUID);
+					physicsEngine.removeObject(physicsObjectUID);
+					sphere.setPhysicsObject(null);
+					System.out.println("Physics object removed.");
+				} catch (Exception e) {
+					System.out.println("Error removing physics object: " + e.getMessage());
+					e.printStackTrace();
+				}
 			}
 
 			// Remove from scene graph
-			engine.getSceneGraph().removeGameObject(sphere);
+			if (sphere != null) {
+				try {
+					System.out.println("Attempting to remove sphere from scene graph...");
+					engine.getSceneGraph().removeGameObject(sphere);
+					System.out.println("Sphere removed from scene graph.");
+				} catch (Exception e) {
+					System.out.println("Error removing from scene graph: " + e.getMessage());
+					e.printStackTrace();
+				}
+			}
 
+			// Clear references
 			sphereCreated = false;
-			sphereP = null;
-			System.out.println("Sphere removed after lifetime expired");
+			sphere = null;
+			System.out.println("Sphere reference cleared.");
 		}
 	}
 
+	private void checkBallBoundary() {
+		if (sphereCreated && sphere != null) {
+			Vector3f spherePos = sphere.getWorldLocation();
+
+			// Check if the ball has hit or gone below y=0.1
+			if (spherePos.y() <= 0.1f) {
+				System.out.println("Ball hit ground! Removing...");
+				removeSphere();
+			}
+		}
+	}
 	// ---------- PHYSICS UTILITY METHODS ----------------
+
+	private void checkPlayerHits() {
+		// Only check for hits if player is not invulnerable
+		if (!isInvulnerable && gm != null) {
+			Vector3f avatarPos = avatar.getWorldLocation();
+			float avatarRadius = 0.5f; // Approximate size of avatar
+
+			// Get ghost balls (we'll need to add a getGhostBalls method to GhostManager)
+			Vector<GhostBall> ghostBalls = gm.getGhostBalls();
+
+			if (ghostBalls != null) {
+				for (GhostBall ghostBall : ghostBalls) {
+					if (ghostBall != null) {
+						Vector3f ballPos = ghostBall.getWorldLocation();
+						float ballRadius = 0.07f;
+
+						// Simple distance-based collision detection
+						float distance = ballPos.distance(avatarPos);
+
+						if (distance < (ballRadius + avatarRadius)) {
+							// We've been hit!
+							handlePlayerHit(ghostBall.getID(), ghostBall.getOwnerID());
+							break; // Only handle one hit per frame
+						}
+					}
+				}
+			}
+		}
+	}
+
+	private void handlePlayerHit(UUID ballId, UUID throwerId) {
+		// Reduce health
+		playerHealth--;
+		System.out.println("Player hit! Health reduced to: " + playerHealth);
+		
+		// Apply invulnerability
+		isInvulnerable = true;
+		invulnerabilityStartTime = System.currentTimeMillis();
+		
+		// Remove the ghost ball
+		gm.removeGhostBall(ballId);
+		
+		// Check for game over
+		if (playerHealth <= 0) {
+			System.out.println("GAME OVER - Player out of health!");
+			// You could add more game over handling here
+		}
+	}
 
 	private void checkForCollisions() {
 		com.bulletphysics.dynamics.DynamicsWorld dynamicsWorld;
