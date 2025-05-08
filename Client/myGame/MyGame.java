@@ -85,6 +85,7 @@ public class MyGame extends VariableFrameRateGame {
 	private boolean isInvulnerable = false;
 	private long invulnerabilityStartTime = 0;
 	private final long INVULNERABILITY_DURATION = 1000;
+	private boolean byeMessageSent = false;
 
 	public ObjShape getSphereShape() {
 		return sphereS;
@@ -230,7 +231,6 @@ public class MyGame extends VariableFrameRateGame {
 		terr.setPhysicsObject(terrainP);
 		// Enable physics world rendering for debugging
 		engine.enableGraphicsWorldRender();
-		engine.enablePhysicsWorldRender();
 
 		// ----------------- INPUTS SECTION -----------------------------
 		im = engine.getInputManager();
@@ -275,6 +275,19 @@ public class MyGame extends VariableFrameRateGame {
 		prevTime = System.currentTimeMillis();
 		amt = elapsedTime * 0.03;
 		Camera c = (engine.getRenderSystem()).getViewport("MAIN").getCamera();
+
+		// ----------------- Removing Ghosts of Clients that leave ----------------
+		java.lang.Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+			if (protClient != null && isClientConnected && !byeMessageSent) {
+				byeMessageSent = true;
+				System.out.println("Sending bye message before shutdown...");
+				protClient.sendByeMessage();
+			}
+		}));
+
+		if (playerHealth <= 0) {
+			System.exit(0);
+		}
 
 		// Check if invulnerability period is over
 		if (isInvulnerable && System.currentTimeMillis() - invulnerabilityStartTime > INVULNERABILITY_DURATION) {
@@ -588,14 +601,14 @@ public class MyGame extends VariableFrameRateGame {
 		// Reduce health
 		playerHealth--;
 		System.out.println("Player hit! Health reduced to: " + playerHealth);
-		
+
 		// Apply invulnerability
 		isInvulnerable = true;
 		invulnerabilityStartTime = System.currentTimeMillis();
-		
+
 		// Remove the ghost ball
 		gm.removeGhostBall(ballId);
-		
+
 		// Check for game over
 		if (playerHealth <= 0) {
 			System.out.println("GAME OVER - Player out of health!");
