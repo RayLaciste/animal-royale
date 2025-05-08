@@ -30,6 +30,8 @@ import tage.physics.JBullet.*;
 import com.bulletphysics.dynamics.RigidBody;
 import com.bulletphysics.collision.dispatch.CollisionObject;
 
+import tage.audio.*;
+
 public class MyGame extends VariableFrameRateGame {
 	JumpAction jumpAction;
 
@@ -80,13 +82,6 @@ public class MyGame extends VariableFrameRateGame {
 	private PhysicsObject sphereP;
 	private boolean sphereCreated = false;
 
-	// player stuff
-	private int playerHealth = 3; // Start with 3 health
-	private boolean isInvulnerable = false;
-	private long invulnerabilityStartTime = 0;
-	private final long INVULNERABILITY_DURATION = 1000;
-	private boolean byeMessageSent = false;
-
 	public ObjShape getSphereShape() {
 		return sphereS;
 	}
@@ -94,6 +89,23 @@ public class MyGame extends VariableFrameRateGame {
 	public TextureImage getSphereTexture() {
 		return sphereTx;
 	}
+
+	// player stuff
+	private int playerHealth = 3; // Start with 3 health
+	private boolean isInvulnerable = false;
+	private long invulnerabilityStartTime = 0;
+	private final long INVULNERABILITY_DURATION = 1000;
+	private boolean byeMessageSent = false;
+
+	// shield stuff
+	private boolean isShielding = false;
+	private boolean shieldOnCooldown = false;
+	private long shieldCooldownStartTime = 0;
+	private final long SHIELD_COOLDOWN_DURATION = 1500;
+
+	// sounds
+	private IAudioManager audioMgr;
+	private Sound blockSound;
 
 	private String serverAddress;
 	private int serverPort;
@@ -106,6 +118,8 @@ public class MyGame extends VariableFrameRateGame {
 	private boolean hitboxActive = false;
 	private long hitboxActivationTime = 0;
 	private final long HITBOX_DURATION = 200;
+
+	long currentTime;
 
 	public MyGame(String serverAddress, int serverPort, String protocol) {
 		super();
@@ -123,6 +137,16 @@ public class MyGame extends VariableFrameRateGame {
 		engine = new Engine(game);
 		game.initializeSystem();
 		game.game_loop();
+	}
+
+	public void loadSounds() {
+		audioMgr = engine.getAudioManager();
+		AudioResource blockResource = audioMgr.createAudioResource("block.wav", AudioResourceType.AUDIO_SAMPLE);
+		blockSound = new Sound(blockResource, SoundType.SOUND_EFFECT, 100, false);
+		blockSound.initialize(audioMgr);
+		blockSound.setMaxDistance(10.0f);
+		blockSound.setMinDistance(0.5f);
+		blockSound.setRollOff(5.0f);
 	}
 
 	@Override
@@ -261,6 +285,11 @@ public class MyGame extends VariableFrameRateGame {
 		TurnAction turnAction = new TurnAction(this, protClient);
 		BackwardAction backwardAction = new BackwardAction(this, protClient);
 		jumpAction = new JumpAction(this, protClient);
+		ShieldToggleAction shieldToggleAction = new ShieldToggleAction(this, protClient);
+
+		im.associateActionWithAllKeyboards(
+				net.java.games.input.Component.Identifier.Key.Q,
+				shieldToggleAction, InputManager.INPUT_ACTION_TYPE.ON_PRESS_ONLY);
 
 		// attach the action objects to keyboard and gamepad components
 		im.associateActionWithAllGamepads(
@@ -310,28 +339,71 @@ public class MyGame extends VariableFrameRateGame {
 			System.exit(0);
 		}
 
+		currentTime = System.currentTimeMillis();
+
 		// Check if invulnerability period is over
 		if (isInvulnerable && System.currentTimeMillis() - invulnerabilityStartTime > INVULNERABILITY_DURATION) {
 			isInvulnerable = false;
 		}
 
-		// Calculate cooldown percentage for ball throws
-		long currentTime = System.currentTimeMillis();
-		float cooldownRemaining = 0;
-		if (currentTime - lastBallThrowTime < BALL_THROW_COOLDOWN) {
-			cooldownRemaining = (BALL_THROW_COOLDOWN - (currentTime - lastBallThrowTime)) / 1000.0f;
+		// Check if shield cooldown is over
+		if (shieldOnCooldown && System.currentTimeMillis() - shieldCooldownStartTime > SHIELD_COOLDOWN_DURATION) {
+			shieldOnCooldown = false;
 		}
 
-		// Build and set HUD to show health
+		// Calculate cooldowns
+		long currentTime = System.currentTimeMillis();
+		float throwCooldownRemaining = 0;
+		if (currentTime - lastBallThrowTime < BALL_THROW_COOLDOWN) {
+			throwCooldownRemaining = (BALL_THROW_COOLDOWN - (currentTime - lastBallThrowTime)) / 1000.0f;
+		}
+
+		float shieldCooldownRemaining = 0;
+		if (shieldOnCooldown) {
+			shieldCooldownRemaining = (SHIELD_COOLDOWN_DURATION - (currentTime - shieldCooldownStartTime)) / 1000.0f;
+		}
+
+		// Build and set HUD to show health and combined status
 		String healthStr = "Health: " + playerHealth;
 
-		String throwStatus = cooldownRemaining > 0 ? "Throw cooldown: " + String.format("%.1f", cooldownRemaining) + "s"
-				: "Ready to throw!";
+		// Construct the combined status string
+		StringBuilder statusBuilder = new StringBuilder();
 
-		Vector3f hud1Color = new Vector3f(1, 0, 0);
-		Vector3f hud2Color = new Vector3f(1, 1, 1);
+		// Add shield status
+		if (isShielding) {
+			statusBuilder.append("SHIELD ACTIVE");
+		} else if (shieldOnCooldown) {
+			statusBuilder.append("Shield: ").append(String.format("%.1f", shieldCooldownRemaining)).append("s");
+		} else {
+			statusBuilder.append("Shield Ready (Q)");
+		}
+
+		// Add separator
+		statusBuilder.append(" | ");
+
+		// Add throw status
+		if (throwCooldownRemaining > 0) {
+			statusBuilder.append("Throw: ").append(String.format("%.1f", throwCooldownRemaining)).append("s");
+		} else {
+			statusBuilder.append("Throw Ready (R)");
+		}
+
+		// Set colors - health is red, status is dynamic based on state
+		Vector3f hud1Color = new Vector3f(1, 0, 0); // Red for health
+		Vector3f hud2Color;
+
+		// Determine color based on priority: shielding > on cooldown > ready
+		if (isShielding) {
+			hud2Color = new Vector3f(0, 1, 0); // Green when shield is active
+		} else if (shieldOnCooldown || throwCooldownRemaining > 0) {
+			hud2Color = new Vector3f(0.8f, 0.8f, 0); // Yellow when something is on cooldown
+		} else {
+			hud2Color = new Vector3f(0, 0.8f, 1); // Blue when everything is ready
+		}
+
+		// Set HUD elements
 		(engine.getHUDmanager()).setHUD1(healthStr, hud1Color, 15, 15);
-		(engine.getHUDmanager()).setHUD2(throwStatus, hud2Color, 500, 15);
+		(engine.getHUDmanager()).setHUD2(statusBuilder.toString(), hud2Color, 15, 45);
 
 		// update inputs and camera
 		im.update((float) elapsedTime);
@@ -433,32 +505,46 @@ public class MyGame extends VariableFrameRateGame {
 	public void keyPressed(KeyEvent e) {
 		switch (e.getKeyCode()) {
 			case KeyEvent.VK_R: {
-				long currentTime = System.currentTimeMillis();
-				// Check if cooldown has passed
-				if (currentTime - lastBallThrowTime > BALL_THROW_COOLDOWN) {
-					// Create and throw a sphere when R is pressed
-					createThrowableSphere();
-					lastBallThrowTime = currentTime; // Update the last throw time
+				// Only allow throwing if not shielding and not on cooldown
+				if (!isShielding && !shieldOnCooldown) {
+					long currentTime = System.currentTimeMillis();
+					// Check if throw cooldown has passed
+					if (currentTime - lastBallThrowTime > BALL_THROW_COOLDOWN) {
+						// Create and throw a sphere when R is pressed
+						createThrowableSphere();
+						lastBallThrowTime = currentTime; // Update the last throw time
 
-					// Start physics if not already running
-					if (!running) {
-						running = true;
-						System.out.println("starting physics");
+						// Start physics if not already running
+						if (!running) {
+							running = true;
+							System.out.println("starting physics");
+						}
+					} else {
+						// Calculate remaining cooldown time in seconds
+						float remainingCooldown = (BALL_THROW_COOLDOWN - (currentTime - lastBallThrowTime)) / 1000.0f;
+						System.out.println("Throw on cooldown! Ready in " + remainingCooldown + " seconds");
 					}
-				} else {
-					// Calculate remaining cooldown time in seconds
-					float remainingCooldown = (BALL_THROW_COOLDOWN - (currentTime - lastBallThrowTime)) / 1000.0f;
-					System.out.println("Throw on cooldown! Ready in " + remainingCooldown + " seconds");
+				} else if (isShielding) {
+					System.out.println("Cannot throw while shielding!");
+				} else if (shieldOnCooldown) {
+					System.out.println("Cannot throw during shield cooldown!");
 				}
 				break;
 			}
 			case KeyEvent.VK_E: {
-				// Activate hitbox when E is pressed
-				activateHitbox();
+				// Only allow hitbox activation if not shielding and not on cooldown
+				if (!isShielding && !shieldOnCooldown) {
+					// Activate hitbox when E is pressed
+					activateHitbox();
+				} else if (isShielding) {
+					System.out.println("Cannot attack while shielding!");
+				} else if (shieldOnCooldown) {
+					System.out.println("Cannot attack during shield cooldown!");
+				}
 				break;
 			}
 			case KeyEvent.VK_T: {
-				// Toggle physics world rendering
+				// Existing code for physics world toggle
 				showPhysicsWorld = !showPhysicsWorld;
 				if (showPhysicsWorld) {
 					engine.enablePhysicsWorldRender();
@@ -473,8 +559,35 @@ public class MyGame extends VariableFrameRateGame {
 		super.keyPressed(e);
 	}
 
+	@Override
+	public void keyReleased(KeyEvent e) {
+
+	}
+
+	public void toggleShield() {
+		// Only toggle if not on cooldown
+		if (!shieldOnCooldown) {
+			isShielding = !isShielding;
+
+			if (isShielding) {
+				// Shield activated
+				System.out.println("Shield activated!");
+			} else {
+				// Shield deactivated, start cooldown
+				shieldOnCooldown = true;
+				shieldCooldownStartTime = System.currentTimeMillis();
+				System.out.println("Shield deactivated, on cooldown!");
+			}
+		} else {
+			float cooldownRemaining = (SHIELD_COOLDOWN_DURATION
+					- (System.currentTimeMillis() - shieldCooldownStartTime)) / 1000.0f;
+			System.out.println("Shield on cooldown! Ready in " + String.format("%.1f", cooldownRemaining) + " seconds");
+		}
+	}
+
 	private void activateHitbox() {
-		// Enable rendering to make it visible
+		// ! ADJUST THIS FOR AFTER YOU ADD ANIMATIONS Enable rendering to make it
+		// visible
 		hitbox.getRenderStates().enableRendering();
 
 		// Start tracking activation time
@@ -492,8 +605,6 @@ public class MyGame extends VariableFrameRateGame {
 			System.out.println("Hitbox deactivated");
 		}
 
-		// While the hitbox is active, you can add code here to check for collisions
-		// with other players
 		if (hitboxActive) {
 			checkHitboxCollisions();
 		}
@@ -548,7 +659,17 @@ public class MyGame extends VariableFrameRateGame {
 	}
 
 	public void handlePlayerHit() {
-		// Only apply damage if not already invulnerable
+		if (isShielding) {
+			System.out.println("Shield blocked the hit!");
+
+			// Deactivate shield and start cooldown
+			isShielding = false;
+			shieldOnCooldown = true;
+			shieldCooldownStartTime = System.currentTimeMillis();
+
+			return;
+		}
+
 		if (!isInvulnerable) {
 			playerHealth--;
 			System.out.println("Player hit! Health reduced to: " + playerHealth);
@@ -568,10 +689,10 @@ public class MyGame extends VariableFrameRateGame {
 
 	// * ---------- Physics throw SECTION ----------------
 	private long sphereCreationTime = 0;
-	private final long SPHERE_LIFETIME = 2500; // 2.5 seconds
+	private final long SPHERE_LIFETIME = 2000; // 2 seconds
 	private UUID sphereId = null;
 	private long lastBallThrowTime = 0;
-	private final long BALL_THROW_COOLDOWN = 1500;
+	private final long BALL_THROW_COOLDOWN = 3000;
 
 	private void createThrowableSphere() {
 		if (sphereCreated) {
@@ -626,7 +747,7 @@ public class MyGame extends VariableFrameRateGame {
 
 		// Set up direction with upward component
 		Vector3f tossDir = new Vector3f(fwdDirection.x(), fwdDirection.y(), fwdDirection.z());
-		tossDir.add(0.0f, 0.45f, 0.0f);
+		tossDir.add(0.0f, 0.30f, 0.0f);
 		tossDir.normalize();
 
 		// Apply force immediately for throwing
@@ -709,12 +830,11 @@ public class MyGame extends VariableFrameRateGame {
 	// ---------- PHYSICS UTILITY METHODS ----------------
 
 	private void checkPlayerHits() {
-		// Only check for hits if player is not invulnerable
+		// Only check for hits if not invulnerable and ghost manager exists
 		if (!isInvulnerable && gm != null) {
 			Vector3f avatarPos = avatar.getWorldLocation();
 			float avatarRadius = 0.5f; // Approximate size of avatar
 
-			// Get ghost balls (we'll need to add a getGhostBalls method to GhostManager)
 			Vector<GhostBall> ghostBalls = gm.getGhostBalls();
 
 			if (ghostBalls != null) {
@@ -723,12 +843,24 @@ public class MyGame extends VariableFrameRateGame {
 						Vector3f ballPos = ghostBall.getWorldLocation();
 						float ballRadius = 0.07f;
 
-						// Simple distance-based collision detection
 						float distance = ballPos.distance(avatarPos);
 
 						if (distance < (ballRadius + avatarRadius)) {
-							// We've been hit!
-							handlePlayerHit(ghostBall.getID(), ghostBall.getOwnerID());
+							// A hit is detected, now check if shield is active
+							if (isShielding) {
+								System.out.println("Shield blocked the hit!");
+
+								// Deactivate shield and start cooldown
+								isShielding = false;
+								shieldOnCooldown = true;
+								shieldCooldownStartTime = System.currentTimeMillis();
+
+								// Remove the ghost ball that hit the shield
+								gm.removeGhostBall(ghostBall.getID());
+							} else {
+								// No shield active, so apply damage
+								handlePlayerHit(ghostBall.getID(), ghostBall.getOwnerID());
+							}
 							break; // Only handle one hit per frame
 						}
 					}
