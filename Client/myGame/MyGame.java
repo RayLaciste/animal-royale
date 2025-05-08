@@ -44,7 +44,7 @@ public class MyGame extends VariableFrameRateGame {
 
 	private GameObject tor, avatar, x, y, z;
 	private ObjShape torS, ghostS, dolS, linxS, linyS, linzS;
-	private TextureImage doltx, ghostT;
+	private TextureImage doltx, ghostT, metalTx;
 	private Light light;
 
 	// ground
@@ -105,7 +105,9 @@ public class MyGame extends VariableFrameRateGame {
 	private GameObject hitbox;
 	private boolean hitboxActive = false;
 	private long hitboxActivationTime = 0;
-	private final long HITBOX_DURATION = 200;
+	private final long HITBOX_DURATION = 100;
+	private long lastAttackTime = 0;
+	private final long ATTACK_COOLDOWN = 1000;
 
 	// shield stuff
 	private GameObject shield;
@@ -113,6 +115,10 @@ public class MyGame extends VariableFrameRateGame {
 	private long shieldActivationTime = 0;
 	private final long SHIELD_DURATION = 5000;
 	private boolean qKeyHeld = false;
+
+	private long shieldDeactivationTime = 0;
+	private final long SHIELD_COOLDOWN = 1500; // 1.5 seconds cooldown
+	private boolean shieldOnCooldown = false;
 
 	public MyGame(String serverAddress, int serverPort, String protocol) {
 		super();
@@ -160,6 +166,7 @@ public class MyGame extends VariableFrameRateGame {
 		npcTex = new TextureImage("frog.png");
 		heightMapTx = new TextureImage("terrain.png");
 		sphereTx = new TextureImage("water.jpg");
+		metalTx = new TextureImage("metal.jpg");
 	}
 
 	@Override
@@ -198,7 +205,7 @@ public class MyGame extends VariableFrameRateGame {
 		hitbox.getRenderStates().disableRendering();
 
 		// shield stuff
-		shield = new GameObject(avatar, new Cube(), groundTx);
+		shield = new GameObject(avatar, new Cube(), metalTx);
 		shield.propagateTranslation(true);
 		shield.propagateRotation(true);
 		shield.applyParentRotationToPosition(true);
@@ -313,12 +320,14 @@ public class MyGame extends VariableFrameRateGame {
 
 	@Override
 	public void update() {
+		updateHUDDisplays();
+		// ^ =============== time setup ===============
 		elapsedTime = System.currentTimeMillis() - prevTime;
 		prevTime = System.currentTimeMillis();
 		amt = elapsedTime * 0.03;
 		Camera c = (engine.getRenderSystem()).getViewport("MAIN").getCamera();
 
-		// ----------------- Removing Ghosts of Clients that leave ----------------
+		// ^ =============== Shutdown / Gameover Checks ===============
 		java.lang.Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			if (protClient != null && isClientConnected && !byeMessageSent) {
 				byeMessageSent = true;
@@ -331,45 +340,12 @@ public class MyGame extends VariableFrameRateGame {
 			System.exit(0);
 		}
 
-		// Check if invulnerability period is over
+		// ^ =============== Player Statuses ===============
+
+		// * invulnerability
 		if (isInvulnerable && System.currentTimeMillis() - invulnerabilityStartTime > INVULNERABILITY_DURATION) {
 			isInvulnerable = false;
 		}
-
-		// Calculate cooldown percentage for ball throws
-		long currentTime = System.currentTimeMillis();
-		float cooldownRemaining = 0;
-		if (currentTime - lastBallThrowTime < BALL_THROW_COOLDOWN) {
-			cooldownRemaining = (BALL_THROW_COOLDOWN - (currentTime - lastBallThrowTime)) / 1000.0f;
-		}
-
-		// Build and set HUD to show health
-		String healthStr = "Health: " + playerHealth;
-
-		String throwStatus = cooldownRemaining > 0 ? "Throw cooldown: " + String.format("%.1f", cooldownRemaining) + "s"
-				: "Ready to throw!";
-
-		Vector3f hud1Color = new Vector3f(1, 0, 0);
-		Vector3f hud2Color = new Vector3f(1, 1, 1);
-		(engine.getHUDmanager()).setHUD1(healthStr, hud1Color, 15, 15);
-		(engine.getHUDmanager()).setHUD2(throwStatus, hud2Color, 500, 15);
-
-		// update inputs and camera
-		im.update((float) elapsedTime);
-
-		if (jumpAction != null) {
-			jumpAction.update();
-		}
-
-		if (hitboxActive) {
-			checkHitboxStatus();
-		}
-		checkPlayerHits();
-
-		if (qKeyHeld) {
-			activateShield();
-		}
-		checkShieldStatus();
 
 		if (isInvulnerable) {
 			// Flash the avatar every 200ms during invulnerability
@@ -386,6 +362,37 @@ public class MyGame extends VariableFrameRateGame {
 			avatar.getRenderStates().enableRendering();
 		}
 
+		// ^ =============== Inputs and Abilities ===============
+		// Calculate cooldown percentage for ball throws
+		// long currentTime = System.currentTimeMillis();
+		// float cooldownRemaining = 0;
+
+		// if (currentTime - lastBallThrowTime < BALL_THROW_COOLDOWN) {
+		// cooldownRemaining = (BALL_THROW_COOLDOWN - (currentTime - lastBallThrowTime))
+		// / 1000.0f;
+		// }
+
+		// * input manager
+		im.update((float) elapsedTime);
+
+		if (jumpAction != null) {
+			jumpAction.update();
+		}
+
+		// * hitbox
+		if (hitboxActive) {
+			checkHitboxStatus();
+		}
+		checkPlayerHits();
+
+		// * shield
+		if (qKeyHeld) {
+			activateShield();
+		}
+		checkShieldStatus();
+
+		// ^ =============== Physics / Projectiles ===============
+		// * Projectile
 		checkBallBoundary();
 
 		if (sphereCreated) {
@@ -401,7 +408,7 @@ public class MyGame extends VariableFrameRateGame {
 			gm.cleanupExpiredBalls(SPHERE_LIFETIME);
 		}
 
-		// Update physics
+		// * Physics
 		if (running) {
 			AxisAngle4f aa = new AxisAngle4f();
 			Matrix4f mat = new Matrix4f();
@@ -428,12 +435,73 @@ public class MyGame extends VariableFrameRateGame {
 			}
 		}
 
+		// ^ =============== Position Updates ===============
 		Vector3f loc = avatar.getWorldLocation();
 		float height = terr.getHeight(loc.x(), loc.z());
 		avatar.setLocalLocation(new Vector3f(loc.x(), height, loc.z()));
 
 		positionCameraBehindAvatar();
 		processNetworking((float) elapsedTime);
+	}
+
+	private void updateHUDDisplays() {
+		long currentTime = System.currentTimeMillis();
+
+		// HUD1 - Health display
+		String healthStr = "Health: " + playerHealth;
+		Vector3f healthColor = new Vector3f(1, 0, 0); // Red color for health
+		(engine.getHUDmanager()).setHUD1(healthStr, healthColor, 15, 15);
+
+		// HUD2 - Ball throw cooldown
+		float throwCooldownRemaining = 0;
+		if (currentTime - lastBallThrowTime < BALL_THROW_COOLDOWN) {
+			throwCooldownRemaining = (BALL_THROW_COOLDOWN - (currentTime - lastBallThrowTime)) / 1000.0f;
+		}
+
+		String throwStatus = throwCooldownRemaining > 0
+				? "Throw CD: " + String.format("%.1f", throwCooldownRemaining) + "s"
+				: "Throw Ready";
+		Vector3f throwColor = throwCooldownRemaining > 0
+				? new Vector3f(1.0f, 0.5f, 0.0f) // Orange for cooldown
+				: new Vector3f(0.0f, 1.0f, 0.0f); // Green for ready
+		(engine.getHUDmanager()).setHUD2(throwStatus, throwColor, 15, 40);
+
+		// HUD3 - Shield status with clear visual indicators
+		String shieldStatus;
+		Vector3f shieldColor;
+
+		if (shieldActive) {
+			long remainingTime = SHIELD_DURATION - (currentTime - shieldActivationTime);
+			float secondsRemaining = Math.max(0, remainingTime / 1000.0f);
+			shieldStatus = "Shield: ACTIVE [" + String.format("%.1f", secondsRemaining) + "s]";
+			shieldColor = new Vector3f(0, 0.7f, 1); // Blue for active shield
+		} else if (shieldOnCooldown) {
+			long cooldownRemaining = SHIELD_COOLDOWN - (currentTime - shieldDeactivationTime);
+			float secondsRemaining = Math.max(0, cooldownRemaining / 1000.0f);
+			shieldStatus = "Shield: COOLDOWN [" + String.format("%.1f", secondsRemaining) + "s]";
+			shieldColor = new Vector3f(0.7f, 0.7f, 0.7f); // Gray for cooldown
+		} else {
+			shieldStatus = "Shield: READY [Hold Q]";
+			shieldColor = new Vector3f(0.0f, 1.0f, 0.0f); // Green for ready
+		}
+		(engine.getHUDmanager()).setHUD3(shieldStatus, shieldColor, 15, 65);
+
+		// HUD4 - Attack status
+		String attackStatus;
+		Vector3f attackColor;
+
+		if (hitboxActive) {
+			attackStatus = "Attack: ACTIVE";
+			attackColor = new Vector3f(1.0f, 0.0f, 0.0f); // Red for active attack
+		} else if (currentTime - lastAttackTime < ATTACK_COOLDOWN) {
+			float attackCooldownRemaining = (ATTACK_COOLDOWN - (currentTime - lastAttackTime)) / 1000.0f;
+			attackStatus = "Attack: COOLDOWN [" + String.format("%.1f", attackCooldownRemaining) + "s]";
+			attackColor = new Vector3f(1.0f, 0.5f, 0.0f); // Orange for cooldown
+		} else {
+			attackStatus = "Attack: READY [Press E]";
+			attackColor = new Vector3f(0.0f, 1.0f, 0.0f); // Green for ready
+		}
+		(engine.getHUDmanager()).setHUD4(attackStatus, attackColor, 15, 90);
 	}
 
 	private void positionCameraBehindAvatar() {
@@ -521,7 +589,7 @@ public class MyGame extends VariableFrameRateGame {
 	}
 
 	private void activateShield() {
-		if (!shieldActive) {
+		if (!shieldActive && !shieldOnCooldown) {
 			// Enable rendering to make it visible
 			shield.getRenderStates().enableRendering();
 
@@ -530,6 +598,11 @@ public class MyGame extends VariableFrameRateGame {
 			shieldActive = true;
 
 			System.out.println("Shield activated");
+		} else if (shieldOnCooldown) {
+			// Calculate remaining cooldown time in seconds
+			float remainingCooldown = (SHIELD_COOLDOWN - (System.currentTimeMillis() - shieldDeactivationTime))
+					/ 1000.0f;
+			System.out.println("Shield on cooldown! Ready in " + remainingCooldown + " seconds");
 		}
 	}
 
@@ -537,11 +610,21 @@ public class MyGame extends VariableFrameRateGame {
 		if (shieldActive) {
 			shield.getRenderStates().disableRendering();
 			shieldActive = false;
-			System.out.println("Shield deactivated");
+
+			shieldDeactivationTime = System.currentTimeMillis();
+			shieldOnCooldown = true;
+
+			System.out.println("Shield deactivated and on cooldown");
 		}
 	}
 
 	private void checkShieldStatus() {
+		// Check if shield cooldown is over
+		if (shieldOnCooldown && System.currentTimeMillis() - shieldDeactivationTime > SHIELD_COOLDOWN) {
+			shieldOnCooldown = false;
+			System.out.println("Shield cooldown ended");
+		}
+
 		// If Q is not held down anymore or shield duration exceeded, deactivate shield
 		if (shieldActive && (!qKeyHeld || System.currentTimeMillis() - shieldActivationTime > SHIELD_DURATION)) {
 			deactivateShield();
@@ -549,12 +632,23 @@ public class MyGame extends VariableFrameRateGame {
 	}
 
 	private void activateHitbox() {
+		long currentTime = System.currentTimeMillis();
+
+		// Check if attack is on cooldown
+		if (currentTime - lastAttackTime < ATTACK_COOLDOWN) {
+			float remainingCooldown = (ATTACK_COOLDOWN - (currentTime - lastAttackTime)) / 1000.0f;
+			System.out.println("Attack on cooldown! Ready in " + String.format("%.1f", remainingCooldown) + " seconds");
+			return;
+		}
+
 		// Enable rendering to make it visible
 		hitbox.getRenderStates().enableRendering();
 
 		// Start tracking activation time
 		hitboxActivationTime = System.currentTimeMillis();
 		hitboxActive = true;
+
+		lastAttackTime = currentTime;
 
 		System.out.println("Hitbox activated");
 	}
@@ -701,7 +795,7 @@ public class MyGame extends VariableFrameRateGame {
 
 		// Set up direction with upward component
 		Vector3f tossDir = new Vector3f(fwdDirection.x(), fwdDirection.y(), fwdDirection.z());
-		tossDir.add(0.0f, 0.45f, 0.0f);
+		tossDir.add(0.0f, 0.30f, 0.0f);
 		tossDir.normalize();
 
 		// Apply force immediately for throwing
