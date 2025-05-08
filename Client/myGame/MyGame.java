@@ -101,6 +101,12 @@ public class MyGame extends VariableFrameRateGame {
 	private ProtocolClient protClient;
 	private boolean isClientConnected = false;
 
+	// hitbox stuff
+	private GameObject hitbox;
+	private boolean hitboxActive = false;
+	private long hitboxActivationTime = 0;
+	private final long HITBOX_DURATION = 200;
+
 	public MyGame(String serverAddress, int serverPort, String protocol) {
 		super();
 		gm = new GhostManager(this);
@@ -168,6 +174,21 @@ public class MyGame extends VariableFrameRateGame {
 		avatar.setLocalRotation(initialRotation);
 		initialScale = (new Matrix4f()).scaling(0.5f);
 		avatar.setLocalScale(initialScale);
+
+		// hitbox stuff
+		hitbox = new GameObject(avatar, new Cube(), sphereTx);
+		hitbox.propagateTranslation(true);
+		hitbox.propagateRotation(true);
+		hitbox.applyParentRotationToPosition(true);
+
+		Vector3f localOffset = new Vector3f(0.0f, 0.15f, 0.5f);
+		Matrix4f localTranslation = (new Matrix4f()).translation(localOffset);
+		hitbox.setLocalTranslation(localTranslation);
+
+		Matrix4f hitboxScale = (new Matrix4f()).scaling(0.25f);
+		hitbox.setLocalScale(hitboxScale);
+
+		hitbox.getRenderStates().disableRendering();
 
 		// build torus along X axis
 		tor = new GameObject(GameObject.root(), torS);
@@ -319,8 +340,29 @@ public class MyGame extends VariableFrameRateGame {
 			jumpAction.update();
 		}
 
+		if (hitboxActive) {
+			checkHitboxStatus();
+		}
+
 		checkPlayerHits();
+
+		if (isInvulnerable) {
+			// Flash the avatar every 200ms during invulnerability
+			long timeSinceInvulnerable = System.currentTimeMillis() - invulnerabilityStartTime;
+			boolean shouldBeVisible = (timeSinceInvulnerable / 200) % 2 == 0;
+
+			if (shouldBeVisible) {
+				avatar.getRenderStates().enableRendering();
+			} else {
+				avatar.getRenderStates().disableRendering();
+			}
+		} else {
+			// Make sure avatar is visible when not invulnerable
+			avatar.getRenderStates().enableRendering();
+		}
+
 		checkBallBoundary();
+
 		if (sphereCreated) {
 			checkSphereLifetime();
 
@@ -410,6 +452,11 @@ public class MyGame extends VariableFrameRateGame {
 				}
 				break;
 			}
+			case KeyEvent.VK_E: {
+				// Activate hitbox when E is pressed
+				activateHitbox();
+				break;
+			}
 			case KeyEvent.VK_T: {
 				// Toggle physics world rendering
 				showPhysicsWorld = !showPhysicsWorld;
@@ -424,6 +471,99 @@ public class MyGame extends VariableFrameRateGame {
 			}
 		}
 		super.keyPressed(e);
+	}
+
+	private void activateHitbox() {
+		// Enable rendering to make it visible
+		hitbox.getRenderStates().enableRendering();
+
+		// Start tracking activation time
+		hitboxActivationTime = System.currentTimeMillis();
+		hitboxActive = true;
+
+		System.out.println("Hitbox activated");
+	}
+
+	private void checkHitboxStatus() {
+		if (hitboxActive && System.currentTimeMillis() - hitboxActivationTime > HITBOX_DURATION) {
+			// Deactivate the hitbox
+			hitbox.getRenderStates().disableRendering();
+			hitboxActive = false;
+			System.out.println("Hitbox deactivated");
+		}
+
+		// While the hitbox is active, you can add code here to check for collisions
+		// with other players
+		if (hitboxActive) {
+			checkHitboxCollisions();
+		}
+	}
+
+	private void checkHitboxCollisions() {
+		if (hitboxActive && gm != null) {
+			Vector<GhostAvatar> ghostAvatars = gm.getGhostAvatars();
+
+			if (ghostAvatars != null && !ghostAvatars.isEmpty()) {
+				Vector3f hitboxPos = hitbox.getWorldLocation();
+				float hitboxRadius = 0.25f; // Try increasing this if detection is failing
+
+				// Debug output
+				System.out.println("Checking hitbox collisions at: " + hitboxPos.x() + ", " + hitboxPos.y() + ", "
+						+ hitboxPos.z());
+				System.out.println("Number of ghost avatars: " + ghostAvatars.size());
+
+				for (GhostAvatar ghost : ghostAvatars) {
+					if (ghost != null) {
+						Vector3f ghostPos = ghost.getWorldLocation();
+						float ghostRadius = 0.5f; // Approximate size of ghost avatar
+
+						// Debug output for ghost positions
+						System.out.println("Ghost at: " + ghostPos.x() + ", " + ghostPos.y() + ", " + ghostPos.z());
+
+						// Simple distance-based collision detection
+						float distance = hitboxPos.distance(ghostPos);
+						System.out.println("Distance to ghost: " + distance + " (threshold: "
+								+ (hitboxRadius + ghostRadius) + ")");
+
+						if (distance < (hitboxRadius + ghostRadius)) {
+							// We've hit a ghost avatar!
+							System.out.println("HIT DETECTED! Distance: " + distance);
+							handleGhostHit(ghost);
+							break; // Only handle one hit per frame
+						}
+					}
+				}
+			} else {
+				System.out.println("No ghost avatars found or list is empty");
+			}
+		}
+	}
+
+	private void handleGhostHit(GhostAvatar ghost) {
+		System.out.println("Hit ghost avatar: " + ghost.getID());
+
+		if (protClient != null && isClientConnected) {
+			protClient.sendHitPlayerMessage(ghost.getID());
+		}
+	}
+
+	public void handlePlayerHit() {
+		// Only apply damage if not already invulnerable
+		if (!isInvulnerable) {
+			playerHealth--;
+			System.out.println("Player hit! Health reduced to: " + playerHealth);
+
+			// Apply invulnerability
+			isInvulnerable = true;
+			invulnerabilityStartTime = System.currentTimeMillis();
+
+			// Check for game over
+			if (playerHealth <= 0) {
+				System.out.println("GAME OVER - Player out of health!");
+			}
+		} else {
+			System.out.println("Player is invulnerable, hit ignored!");
+		}
 	}
 
 	// * ---------- Physics throw SECTION ----------------

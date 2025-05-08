@@ -92,7 +92,6 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 
 			// Handle moveBall messages
 			if (messageTokens[0].compareTo("moveBall") == 0) {
-				// Format: moveBall, senderId, ballId, x, y, z
 				UUID clientID = UUID.fromString(messageTokens[1]);
 				UUID ballID = UUID.fromString(messageTokens[2]);
 				String[] pos = { messageTokens[3], messageTokens[4], messageTokens[5] };
@@ -102,11 +101,16 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 
 			// Handle removeBall messages
 			if (messageTokens[0].compareTo("removeBall") == 0) {
-				// Format: removeBall, senderId, ballId
 				UUID clientID = UUID.fromString(messageTokens[1]);
 				UUID ballID = UUID.fromString(messageTokens[2]);
 
 				sendRemoveBallMessages(clientID, ballID);
+			}
+
+			if (messageTokens[0].compareTo("hit") == 0) {
+				UUID targetID = UUID.fromString(messageTokens[1]);
+				System.out.println("Received hit message for target: " + targetID);
+				sendHitMessage(targetID);
 			}
 		}
 	}
@@ -273,6 +277,15 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 		try {
 			String message = new String("removeBall," + clientID.toString() + "," + ballID.toString());
 			forwardPacketToAll(message, clientID);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void sendHitMessage(UUID targetID) {
+		try {
+			String message = new String("hit," + targetID.toString());
+			forwardPacketToAll(message, null);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

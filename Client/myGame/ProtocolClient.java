@@ -120,7 +120,7 @@ public class ProtocolClient extends GameConnectionClient {
 			}
 
 			// ^ BALLS
-			
+
 			// Handle createBall messages
 			if (messageTokens[0].compareTo("createBall") == 0) {
 				// Format: createBall, senderId, ballId, x, y, z
@@ -155,6 +155,13 @@ public class ProtocolClient extends GameConnectionClient {
 				// Format: removeBall, senderId, ballId
 				UUID ballId = UUID.fromString(messageTokens[2]);
 				ghostManager.removeGhostBall(ballId);
+			}
+
+			if (messageTokens[0].compareTo("hit") == 0) {
+				UUID targetID = UUID.fromString(messageTokens[1]);
+				if (targetID.equals(id)) {
+					game.handlePlayerHit();
+				}
 			}
 		}
 	}
@@ -280,6 +287,17 @@ public class ProtocolClient extends GameConnectionClient {
 	public void sendRemoveBallMessage(UUID ballId) {
 		try {
 			String message = new String("removeBall," + id.toString() + "," + ballId.toString());
+			sendPacket(message);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void sendHitPlayerMessage(UUID targetID) {
+		try {
+			System.out.println("Sending hit player message for target: " + targetID);
+			String message = new String("hit," + targetID.toString());
+
 			sendPacket(message);
 		} catch (IOException e) {
 			e.printStackTrace();
