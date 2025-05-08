@@ -107,6 +107,13 @@ public class MyGame extends VariableFrameRateGame {
 	private long hitboxActivationTime = 0;
 	private final long HITBOX_DURATION = 200;
 
+	// shield stuff
+	private GameObject shield;
+	private boolean shieldActive = false;
+	private long shieldActivationTime = 0;
+	private final long SHIELD_DURATION = 5000;
+	private boolean qKeyHeld = false;
+
 	public MyGame(String serverAddress, int serverPort, String protocol) {
 		super();
 		gm = new GhostManager(this);
@@ -181,14 +188,28 @@ public class MyGame extends VariableFrameRateGame {
 		hitbox.propagateRotation(true);
 		hitbox.applyParentRotationToPosition(true);
 
-		Vector3f localOffset = new Vector3f(0.0f, 0.15f, 0.5f);
-		Matrix4f localTranslation = (new Matrix4f()).translation(localOffset);
-		hitbox.setLocalTranslation(localTranslation);
+		Vector3f hitboxOffset = new Vector3f(0.0f, 0.15f, 0.25f);
+		Matrix4f hitboxLocalTranslation = (new Matrix4f()).translation(hitboxOffset);
+		hitbox.setLocalTranslation(hitboxLocalTranslation);
 
 		Matrix4f hitboxScale = (new Matrix4f()).scaling(0.25f);
 		hitbox.setLocalScale(hitboxScale);
 
 		hitbox.getRenderStates().disableRendering();
+
+		// shield stuff
+		shield = new GameObject(avatar, new Cube(), groundTx);
+		shield.propagateTranslation(true);
+		shield.propagateRotation(true);
+		shield.applyParentRotationToPosition(true);
+
+		Vector3f shieldLocalOffset = new Vector3f(0.0f, 0.15f, 0.25f);
+		Matrix4f shieldLocalTranslation = (new Matrix4f()).translation(shieldLocalOffset);
+		shield.setLocalTranslation(shieldLocalTranslation);
+		Matrix4f shieldHitboxScale = (new Matrix4f()).scaling(0.25f);
+		shield.setLocalScale(shieldHitboxScale);
+
+		shield.getRenderStates().disableRendering();
 
 		// build torus along X axis
 		tor = new GameObject(GameObject.root(), torS);
@@ -343,8 +364,12 @@ public class MyGame extends VariableFrameRateGame {
 		if (hitboxActive) {
 			checkHitboxStatus();
 		}
-
 		checkPlayerHits();
+
+		if (qKeyHeld) {
+			activateShield();
+		}
+		checkShieldStatus();
 
 		if (isInvulnerable) {
 			// Flash the avatar every 200ms during invulnerability
@@ -432,29 +457,40 @@ public class MyGame extends VariableFrameRateGame {
 	@Override
 	public void keyPressed(KeyEvent e) {
 		switch (e.getKeyCode()) {
+			case KeyEvent.VK_Q: {
+				qKeyHeld = true;
+				break;
+			}
 			case KeyEvent.VK_R: {
-				long currentTime = System.currentTimeMillis();
-				// Check if cooldown has passed
-				if (currentTime - lastBallThrowTime > BALL_THROW_COOLDOWN) {
-					// Create and throw a sphere when R is pressed
-					createThrowableSphere();
-					lastBallThrowTime = currentTime; // Update the last throw time
+				// Don't allow throwing balls while shield is up
+				if (!qKeyHeld && !shieldActive) {
+					long currentTime = System.currentTimeMillis();
+					// Check if cooldown has passed
+					if (currentTime - lastBallThrowTime > BALL_THROW_COOLDOWN) {
+						createThrowableSphere();
+						lastBallThrowTime = currentTime;
 
-					// Start physics if not already running
-					if (!running) {
-						running = true;
-						System.out.println("starting physics");
+						if (!running) {
+							running = true;
+							System.out.println("starting physics");
+						}
+					} else {
+						// Calculate remaining cooldown time in seconds
+						float remainingCooldown = (BALL_THROW_COOLDOWN - (currentTime - lastBallThrowTime)) / 1000.0f;
+						System.out.println("Throw on cooldown! Ready in " + remainingCooldown + " seconds");
 					}
 				} else {
-					// Calculate remaining cooldown time in seconds
-					float remainingCooldown = (BALL_THROW_COOLDOWN - (currentTime - lastBallThrowTime)) / 1000.0f;
-					System.out.println("Throw on cooldown! Ready in " + remainingCooldown + " seconds");
+					System.out.println("Cannot throw while shield is active!");
 				}
 				break;
 			}
 			case KeyEvent.VK_E: {
-				// Activate hitbox when E is pressed
-				activateHitbox();
+				// Don't allow hitbox activation while shield is up
+				if (!qKeyHeld && !shieldActive) {
+					activateHitbox();
+				} else {
+					System.out.println("Cannot use hitbox while shield is active!");
+				}
 				break;
 			}
 			case KeyEvent.VK_T: {
@@ -471,6 +507,45 @@ public class MyGame extends VariableFrameRateGame {
 			}
 		}
 		super.keyPressed(e);
+	}
+
+	@Override
+	public void keyReleased(KeyEvent e) {
+		switch (e.getKeyCode()) {
+			case KeyEvent.VK_Q: {
+				qKeyHeld = false;
+				break;
+			}
+		}
+		super.keyReleased(e);
+	}
+
+	private void activateShield() {
+		if (!shieldActive) {
+			// Enable rendering to make it visible
+			shield.getRenderStates().enableRendering();
+
+			// Start tracking activation time
+			shieldActivationTime = System.currentTimeMillis();
+			shieldActive = true;
+
+			System.out.println("Shield activated");
+		}
+	}
+
+	private void deactivateShield() {
+		if (shieldActive) {
+			shield.getRenderStates().disableRendering();
+			shieldActive = false;
+			System.out.println("Shield deactivated");
+		}
+	}
+
+	private void checkShieldStatus() {
+		// If Q is not held down anymore or shield duration exceeded, deactivate shield
+		if (shieldActive && (!qKeyHeld || System.currentTimeMillis() - shieldActivationTime > SHIELD_DURATION)) {
+			deactivateShield();
+		}
 	}
 
 	private void activateHitbox() {
