@@ -30,6 +30,8 @@ import tage.physics.JBullet.*;
 import com.bulletphysics.dynamics.RigidBody;
 import com.bulletphysics.collision.dispatch.CollisionObject;
 
+import tage.audio.*;
+
 public class MyGame extends VariableFrameRateGame {
 	JumpAction jumpAction;
 
@@ -130,6 +132,11 @@ public class MyGame extends VariableFrameRateGame {
 		return shield.getShape();
 	}
 
+	// Sounds
+	private IAudioManager audioMgr;
+	private Sound blockSound;
+	private Sound slapSound, oofSound;
+
 	public MyGame(String serverAddress, int serverPort, String protocol) {
 		super();
 		gm = new GhostManager(this);
@@ -146,6 +153,40 @@ public class MyGame extends VariableFrameRateGame {
 		engine = new Engine(game);
 		game.initializeSystem();
 		game.game_loop();
+	}
+
+	public void loadSounds() {
+		AudioResource blockResource, slapResource, oofResource;
+		audioMgr = engine.getAudioManager();
+
+		blockResource = audioMgr.createAudioResource("shield.wav", AudioResourceType.AUDIO_SAMPLE);
+		blockSound = new Sound(blockResource, SoundType.SOUND_EFFECT, 100, false);
+		blockSound.initialize(audioMgr);
+
+		blockSound.setMaxDistance(10.0f);
+		blockSound.setMinDistance(0.5f);
+		blockSound.setRollOff(5.0f);
+
+		slapResource = audioMgr.createAudioResource("slap.wav", AudioResourceType.AUDIO_SAMPLE);
+		slapSound = new Sound(slapResource, SoundType.SOUND_EFFECT, 100, false);
+		slapSound.initialize(audioMgr);
+
+		slapSound.setMaxDistance(10.0f);
+		slapSound.setMinDistance(0.5f);
+		slapSound.setRollOff(5.0f);
+
+		oofResource = audioMgr.createAudioResource("oof.wav", AudioResourceType.AUDIO_SAMPLE);
+		oofSound = new Sound(oofResource, SoundType.SOUND_EFFECT, 100, false);
+		oofSound.initialize(audioMgr);
+
+		oofSound.setMaxDistance(10.0f);
+		oofSound.setMinDistance(0.5f);
+		oofSound.setRollOff(5.0f);
+		// Optional: Load a hit sound as well
+		// AudioResource hitResource = audioMgr.createAudioResource("hit.wav",
+		// AudioResourceType.AUDIO_SAMPLE);
+		// hitSound = new Sound(hitResource, SoundType.SOUND_EFFECT, 100, false);
+		// hitSound.initialize(audioMgr);
 	}
 
 	@Override
@@ -453,6 +494,9 @@ public class MyGame extends VariableFrameRateGame {
 			}
 		}
 
+		// ^ =============== Audio ===============
+		setEarParameters();
+
 		// ^ =============== Position Updates ===============
 		Vector3f loc = avatar.getWorldLocation();
 		float height = terr.getHeight(loc.x(), loc.z());
@@ -460,6 +504,12 @@ public class MyGame extends VariableFrameRateGame {
 
 		positionCameraBehindAvatar();
 		processNetworking((float) elapsedTime);
+	}
+
+	public void setEarParameters() {
+		Camera camera = (engine.getRenderSystem()).getViewport("MAIN").getCamera();
+		audioMgr.getEar().setLocation(avatar.getWorldLocation());
+		audioMgr.getEar().setOrientation(camera.getN(), new Vector3f(0.0f, 1.0f, 0.0f));
 	}
 
 	private void updateHUDDisplays() {
@@ -589,6 +639,12 @@ public class MyGame extends VariableFrameRateGame {
 					engine.disablePhysicsWorldRender();
 					System.out.println("hiding physics world");
 				}
+				break;
+			}
+
+			case KeyEvent.VK_U: {
+				blockSound.stop();
+				blockSound.play();
 				break;
 			}
 		}
@@ -746,6 +802,11 @@ public class MyGame extends VariableFrameRateGame {
 		if (shieldActive) {
 			System.out.println("Hit blocked by shield!");
 
+			if (blockSound != null) {
+				blockSound.setLocation(avatar.getWorldLocation());
+				blockSound.play();
+			}
+
 			shield.getRenderStates().setColor(new Vector3f(1.0f, 0.0f, 0.0f));
 			shieldHitTime = System.currentTimeMillis();
 
@@ -760,6 +821,13 @@ public class MyGame extends VariableFrameRateGame {
 		if (!isInvulnerable) {
 			playerHealth--;
 			System.out.println("Player hit! Health reduced to: " + playerHealth);
+
+			if (oofSound != null && slapSound != null) {
+				slapSound.setLocation(avatar.getWorldLocation());
+				oofSound.setLocation(avatar.getWorldLocation());
+				oofSound.play();
+				slapSound.play();
+			}
 
 			// Apply invulnerability
 			isInvulnerable = true;
@@ -949,6 +1017,11 @@ public class MyGame extends VariableFrameRateGame {
 		if (shieldActive) {
 			System.out.println("Ball hit blocked by shield!");
 
+			if (blockSound != null) {
+				blockSound.setLocation(avatar.getWorldLocation());
+				blockSound.play();
+			}
+
 			shield.getRenderStates().setColor(new Vector3f(1.0f, 0.0f, 0.0f));
 			shieldHitTime = System.currentTimeMillis();
 
@@ -964,6 +1037,13 @@ public class MyGame extends VariableFrameRateGame {
 		// Reduce health
 		playerHealth--;
 		System.out.println("Player hit! Health reduced to: " + playerHealth);
+
+		if (oofSound != null && slapSound != null) {
+			slapSound.setLocation(avatar.getWorldLocation());
+			oofSound.setLocation(avatar.getWorldLocation());
+			oofSound.play();
+			slapSound.play();
+		}
 
 		// Apply invulnerability
 		isInvulnerable = true;
