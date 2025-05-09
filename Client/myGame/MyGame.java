@@ -50,7 +50,7 @@ public class MyGame extends VariableFrameRateGame {
 	private Light light;
 
 	private AnimatedShape frogS;
-	private TextureImage frogTx;
+	private TextureImage frogTx, bearTx;
 	private float frogHeightAdjust = 0.65f;
 
 	public AnimatedShape getFrogShape() {
@@ -59,6 +59,14 @@ public class MyGame extends VariableFrameRateGame {
 
 	public TextureImage getFrogTexture() {
 		return frogTx;
+	}
+
+	public TextureImage getBearTexture() {
+		return bearTx;
+	}
+
+	public String getPlayerTexture() {
+		return playerTexture;
 	}
 
 	// ground
@@ -167,19 +175,26 @@ public class MyGame extends VariableFrameRateGame {
 	private Sound blockSound;
 	private Sound slapSound, oofSound;
 
-	public MyGame(String serverAddress, int serverPort, String protocol) {
+	public MyGame(String serverAddress, int serverPort, String protocol, String playerTexture) {
 		super();
 		gm = new GhostManager(this);
 		this.serverAddress = serverAddress;
 		this.serverPort = serverPort;
+		this.playerTexture = playerTexture;
 		if (protocol.toUpperCase().compareTo("TCP") == 0)
 			this.serverProtocol = ProtocolType.TCP;
 		else
 			this.serverProtocol = ProtocolType.UDP;
 	}
 
+	private String playerTexture = "frog.png"; // Default texture
+	private TextureImage avatarTx;
+
 	public static void main(String[] args) {
-		MyGame game = new MyGame(args[0], Integer.parseInt(args[1]), args[2]);
+		TextureSelectionWindow selectionWindow = new TextureSelectionWindow();
+		String selectedTexture = selectionWindow.waitForSelection();
+
+		MyGame game = new MyGame(args[0], Integer.parseInt(args[1]), args[2], selectedTexture);
 		engine = new Engine(game);
 		game.initializeSystem();
 		game.game_loop();
@@ -250,16 +265,18 @@ public class MyGame extends VariableFrameRateGame {
 
 	@Override
 	public void loadTextures() {
-		doltx = new TextureImage("Dolphin_HighPolyUV.png");
-		ghostT = new TextureImage("bear.png");
 		groundTx = new TextureImage("grass.png");
 		npcTex = new TextureImage("frog.png");
 		heightMapTx = new TextureImage("terrain.png");
 		sphereTx = new TextureImage("water.jpg");
 		metalTx = new TextureImage("metal.jpg");
 		shieldTx = new TextureImage("shield.png");
-		swordTx = new TextureImage("metal.jpg"); // ! change
+		swordTx = new TextureImage("metal.jpg"); // ! change ?
 		frogTx = new TextureImage("frog.png");
+		bearTx = new TextureImage("bear.png");
+
+		ghostT = new TextureImage("water.jpg"); // default
+		avatarTx = playerTexture.equals("frog.png") ? frogTx : bearTx;
 	}
 
 	@Override
@@ -284,7 +301,7 @@ public class MyGame extends VariableFrameRateGame {
 		// avatar.setLocalScale(initialScale);
 
 		// Frog avatar
-		avatar = new GameObject(GameObject.root(), frogS, frogTx);
+		avatar = new GameObject(GameObject.root(), frogS, avatarTx);
 		initialTranslation = (new Matrix4f()).translation(-1f, frogHeightAdjust, 1f);
 		avatar.setLocalTranslation(initialTranslation);
 		initialRotation = (new Matrix4f()).rotationY((float) java.lang.Math.toRadians(135.0f));

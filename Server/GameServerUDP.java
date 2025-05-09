@@ -14,6 +14,16 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 		String message = (String) o;
 		String[] messageTokens = message.split(",");
 
+		if (o == null) {
+			System.out.println("Warning: Received null packet - ignoring");
+			return; // Exit early if the object is null
+		}
+
+		if (message == null || message.trim().isEmpty()) {
+			System.out.println("Warning: Received empty message - ignoring");
+			return;
+		}
+
 		if (messageTokens.length > 0) { // JOIN -- Case where client just joined the server
 										// Received Message Format: (join,localId)
 			if (messageTokens[0].compareTo("join") == 0) {
@@ -44,7 +54,13 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 			if (messageTokens[0].compareTo("create") == 0) {
 				UUID clientID = UUID.fromString(messageTokens[1]);
 				String[] pos = { messageTokens[2], messageTokens[3], messageTokens[4] };
-				sendCreateMessages(clientID, pos);
+
+				String textureName = "frog.png"; // Default
+				if (messageTokens.length > 5) {
+					textureName = messageTokens[5];
+				}
+
+				sendCreateMessages(clientID, pos, textureName);
 				sendWantsDetailsMessages(clientID);
 			}
 
@@ -54,7 +70,13 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 				UUID clientID = UUID.fromString(messageTokens[1]);
 				UUID remoteID = UUID.fromString(messageTokens[2]);
 				String[] pos = { messageTokens[3], messageTokens[4], messageTokens[5] };
-				sendDetailsForMessage(clientID, remoteID, pos);
+
+				String textureName = "frog.png"; // Default
+				if (messageTokens.length > 6) {
+					textureName = messageTokens[6];
+				}
+
+				sendDetailsForMessage(clientID, remoteID, pos, textureName);
 			}
 
 			// MOVE --- Case where server receives a move message
@@ -185,12 +207,13 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 	// Message Format: (create,remoteId,x,y,z) where x, y, and z represent the
 	// position
 
-	public void sendCreateMessages(UUID clientID, String[] position) {
+	public void sendCreateMessages(UUID clientID, String[] position, String textureName) {
 		try {
 			String message = new String("create," + clientID.toString());
 			message += "," + position[0];
 			message += "," + position[1];
 			message += "," + position[2];
+			message += "," + textureName;
 			forwardPacketToAll(message, clientID);
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -207,12 +230,13 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 	// Message Format: (dsfr,remoteId,x,y,z) where x, y, and z represent the
 	// position.
 
-	public void sendDetailsForMessage(UUID clientID, UUID remoteId, String[] position) {
+	public void sendDetailsForMessage(UUID clientID, UUID remoteId, String[] position, String textureName) {
 		try {
 			String message = new String("dsfr," + remoteId.toString());
 			message += "," + position[0];
 			message += "," + position[1];
 			message += "," + position[2];
+			message += "," + textureName;
 			sendPacket(message, clientID);
 		} catch (IOException e) {
 			e.printStackTrace();

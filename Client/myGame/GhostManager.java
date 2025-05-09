@@ -74,10 +74,26 @@ public class GhostManager {
 		}
 	}
 
-	public void createGhostAvatar(UUID id, Vector3f position) throws IOException {
-		System.out.println("adding ghost with ID --> " + id);
+	public void createGhostAvatar(UUID id, Vector3f position, String textureName) throws IOException {
+
+		GhostAvatar existingAvatar = findAvatar(id);
+		if (existingAvatar != null) {
+			System.out
+					.println("Avatar with ID " + id + " already exists, updating position instead of creating new one");
+			existingAvatar.setPosition(position);
+			return;
+		}
+
+		System.out.println("adding ghost with ID --> " + id + " using texture --> " + textureName);
 		ObjShape s = game.getGhostShape();
-		TextureImage t = game.getGhostTexture();
+
+		TextureImage t;
+		if (textureName.equals("bear.png")) {
+			t = game.getBearTexture(); // bear.png
+		} else {
+			t = game.getFrogTexture(); // frog.png
+		}
+
 		GhostAvatar newAvatar = new GhostAvatar(id, s, t, position);
 
 		Matrix4f initialScale = (new Matrix4f()).scaling(0.20f);

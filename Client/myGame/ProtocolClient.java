@@ -34,8 +34,8 @@ public class ProtocolClient extends GameConnectionClient {
 		System.out.println("message received -->" + strMessage);
 		String[] messageTokens = strMessage.split(",");
 
-		if (message == null) {
-			System.out.println("Warning: Received null message in processPacket - ignoring");
+		if (strMessage == null || strMessage.trim().isEmpty()) {
+			System.out.println("Warning: Received empty message in processPacket - ignoring");
 			return;
 		}
 
@@ -68,13 +68,7 @@ public class ProtocolClient extends GameConnectionClient {
 			// AND
 			// Handle DETAILS_FOR message
 			// Format: (dsfr,remoteId,x,y,z)
-			if (messageTokens[0].compareTo("create") == 0 || (messageTokens[0].compareTo("dsfr") == 0)) { // create a
-																											// new ghost
-																											// avatar
-																											// Parse out
-																											// the id
-																											// into a
-																											// UUID
+			if (messageTokens[0].compareTo("create") == 0 || (messageTokens[0].compareTo("dsfr") == 0)) {
 				UUID ghostID = UUID.fromString(messageTokens[1]);
 
 				// Parse out the position into a Vector3f
@@ -83,8 +77,13 @@ public class ProtocolClient extends GameConnectionClient {
 						Float.parseFloat(messageTokens[3]),
 						Float.parseFloat(messageTokens[4]));
 
+				String textureName = "frog.png"; // Default
+				if (messageTokens.length > 5) {
+					textureName = messageTokens[5];
+				}
+
 				try {
-					ghostManager.createGhostAvatar(ghostID, ghostPosition);
+					ghostManager.createGhostAvatar(ghostID, ghostPosition, textureName);
 				} catch (IOException e) {
 					System.out.println("error creating ghost avatar");
 				}
@@ -124,7 +123,7 @@ public class ProtocolClient extends GameConnectionClient {
 				ghostManager.updateGhostRotation(ghostID, rotation);
 			}
 
-			// ^ BALLS
+			// ^ ============================== BALLS ==============================
 
 			// Handle createBall messages
 			if (messageTokens[0].compareTo("createBall") == 0) {
@@ -229,6 +228,7 @@ public class ProtocolClient extends GameConnectionClient {
 			message += "," + position.x();
 			message += "," + position.y();
 			message += "," + position.z();
+			message += "," + game.getPlayerTexture();
 
 			sendPacket(message);
 			sendRotateMessage(game.getAvatar().getWorldRotation());
@@ -250,6 +250,7 @@ public class ProtocolClient extends GameConnectionClient {
 			message += "," + position.x();
 			message += "," + position.y();
 			message += "," + position.z();
+			message += "," + game.getPlayerTexture();
 
 			sendPacket(message);
 		} catch (IOException e) {
