@@ -131,6 +131,11 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 				sendShieldHitMessages(clientID);
 			}
 
+			// ^ ========================= Sword Stuff ========================= ^ //
+			if (messageTokens[0].compareTo("sword_animate") == 0) {
+				UUID clientID = UUID.fromString(messageTokens[1]);
+				sendSwordAnimateMessages(clientID);
+			}
 		}
 	}
 
@@ -332,6 +337,16 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 	public void sendShieldHitMessages(UUID clientID) {
 		try {
 			String message = new String("shield_hit," + clientID.toString());
+			forwardPacketToAll(message, clientID);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	// ^ ========================= Sword Stuff ========================= ^ //
+	public void sendSwordAnimateMessages(UUID clientID) {
+		try {
+			String message = new String("sword_animate," + clientID.toString());
 			forwardPacketToAll(message, clientID);
 		} catch (IOException e) {
 			e.printStackTrace();

@@ -184,6 +184,12 @@ public class ProtocolClient extends GameConnectionClient {
 				UUID ghostID = UUID.fromString(messageTokens[1]);
 				ghostManager.triggerGhostShieldHitEffect(ghostID);
 			}
+
+			// ^ ============================== Sword Stuff ==============================
+			if (messageTokens[0].compareTo("sword_animate") == 0) {
+				UUID ghostID = UUID.fromString(messageTokens[1]);
+				ghostManager.triggerGhostSwordAnimation(ghostID);
+			}
 		}
 	}
 
@@ -348,6 +354,16 @@ public class ProtocolClient extends GameConnectionClient {
 	public void sendShieldHitMessage() {
 		try {
 			String message = new String("shield_hit," + id.toString());
+			sendPacket(message);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	// ^ ========================== Sword Stuff ========================== ^ //
+	public void sendSwordAnimationMessage() {
+		try {
+			String message = new String("sword_animate," + id.toString());
 			sendPacket(message);
 		} catch (IOException e) {
 			e.printStackTrace();

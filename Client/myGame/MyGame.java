@@ -124,6 +124,24 @@ public class MyGame extends VariableFrameRateGame {
 	private long shieldHitTime = 0;
 	private final long SHIELD_HIT_FLASH_DURATION = 200;
 
+	private ObjShape shieldS;
+	private TextureImage shieldTx;
+
+	private GameObject sword;
+	private ObjShape swordS;
+	private TextureImage swordTx;
+	private float swordAnimationProgress = 0.0f;
+	private boolean swordAnimating = false;
+	private final float SWORD_ANIMATION_SPEED = 3.0f;
+
+	public ObjShape getSwordShape() {
+		return swordS;
+	}
+
+	public TextureImage getSwordTexture() {
+		return swordTx;
+	}
+
 	public TextureImage getShieldTexture() {
 		return shield.getTextureImage();
 	}
@@ -192,8 +210,10 @@ public class MyGame extends VariableFrameRateGame {
 	@Override
 	public void loadShapes() {
 		torS = new Torus(0.5f, 0.2f, 48);
-		ghostS = new Sphere();
+
 		dolS = new ImportedModel("dolphinHighPoly.obj");
+
+		ghostS = dolS;
 
 		// terrain
 		terrS = new TerrainPlane(1000);
@@ -203,6 +223,12 @@ public class MyGame extends VariableFrameRateGame {
 
 		// sphere (throwable)
 		sphereS = new Sphere();
+
+		// shield
+		shieldS = new ImportedModel("shield.obj");
+
+		// sword
+		swordS = new ImportedModel("sword.obj");
 
 		linxS = new Line(new Vector3f(0f, 0f, 0f), new Vector3f(3f, 0f, 0f));
 		linyS = new Line(new Vector3f(0f, 0f, 0f), new Vector3f(0f, 3f, 0f));
@@ -218,6 +244,8 @@ public class MyGame extends VariableFrameRateGame {
 		heightMapTx = new TextureImage("terrain.png");
 		sphereTx = new TextureImage("water.jpg");
 		metalTx = new TextureImage("metal.jpg");
+		shieldTx = new TextureImage("shield.png");
+		swordTx = new TextureImage("metal.jpg"); // ! change
 	}
 
 	@Override
@@ -256,18 +284,33 @@ public class MyGame extends VariableFrameRateGame {
 		hitbox.getRenderStates().disableRendering();
 
 		// shield stuff
-		shield = new GameObject(avatar, new Cube(), metalTx);
+		shield = new GameObject(avatar, shieldS, shieldTx);
 		shield.propagateTranslation(true);
 		shield.propagateRotation(true);
 		shield.applyParentRotationToPosition(true);
 
-		Vector3f shieldLocalOffset = new Vector3f(0.0f, 0.15f, 0.25f);
+		Vector3f shieldLocalOffset = new Vector3f(0.2f, 0.15f, 0.1f);
 		Matrix4f shieldLocalTranslation = (new Matrix4f()).translation(shieldLocalOffset);
 		shield.setLocalTranslation(shieldLocalTranslation);
-		Matrix4f shieldHitboxScale = (new Matrix4f()).scaling(0.25f);
+
+		Matrix4f shieldHitboxScale = (new Matrix4f()).scaling(0.2f);
 		shield.setLocalScale(shieldHitboxScale);
 
-		shield.getRenderStates().disableRendering();
+		// sword stuff
+		sword = new GameObject(avatar, swordS, swordTx);
+		sword.propagateTranslation(true);
+		sword.propagateRotation(true);
+		sword.applyParentRotationToPosition(true);
+
+		Vector3f swordOffset = new Vector3f(-0.2f, 0.15f, 0.1f);
+		Matrix4f swordLocalTranslation = (new Matrix4f()).translation(swordOffset);
+		sword.setLocalTranslation(swordLocalTranslation);
+
+		Matrix4f swordLocalRotation = (new Matrix4f()).rotationY((float) Math.toRadians(-90.0f));
+		sword.setLocalRotation(swordLocalRotation);
+
+		Matrix4f swordScale = (new Matrix4f()).scaling(0.75f);
+		sword.setLocalScale(swordScale);
 
 		// build torus along X axis
 		tor = new GameObject(GameObject.root(), torS);
@@ -450,6 +493,8 @@ public class MyGame extends VariableFrameRateGame {
 			}
 		}
 
+		updateSwordAnimation((float) elapsedTime / 1000.0f);
+
 		// ^ =============== Physics / Projectiles ===============
 		// * Projectile
 		checkBallBoundary();
@@ -465,6 +510,7 @@ public class MyGame extends VariableFrameRateGame {
 
 		if (gm != null) {
 			gm.cleanupExpiredBalls(SPHERE_LIFETIME);
+			gm.update((float) elapsedTime);
 		}
 
 		// * Physics
@@ -527,7 +573,7 @@ public class MyGame extends VariableFrameRateGame {
 		}
 
 		String throwStatus = throwCooldownRemaining > 0
-				? "Throw CD: " + String.format("%.1f", throwCooldownRemaining) + "s"
+				? "Throw COOLDOWN: " + String.format("%.1f", throwCooldownRemaining) + "s"
 				: "Throw Ready";
 		Vector3f throwColor = throwCooldownRemaining > 0
 				? new Vector3f(1.0f, 0.5f, 0.0f) // Orange for cooldown
@@ -662,10 +708,62 @@ public class MyGame extends VariableFrameRateGame {
 		super.keyReleased(e);
 	}
 
+	private void updateSwordAnimation(float elapsedTimeSeconds) {
+		if (swordAnimating) {
+			// Update animation progress
+			swordAnimationProgress += SWORD_ANIMATION_SPEED * elapsedTimeSeconds;
+
+			if (swordAnimationProgress >= 1.0f) {
+				// Animation complete - return to original position
+				swordAnimating = false;
+				swordAnimationProgress = 0.0f;
+
+				// Reset sword to original position (pointing up)
+				Vector3f swordOffset = new Vector3f(-0.2f, 0.15f, 0.1f);
+				Matrix4f swordLocalTranslation = (new Matrix4f()).translation(swordOffset);
+				sword.setLocalTranslation(swordLocalTranslation);
+
+				// Reset to original rotation (pointing up)
+				Matrix4f swordLocalRotation = (new Matrix4f()).rotationY((float) Math.toRadians(-90.0f));
+				sword.setLocalRotation(swordLocalRotation);
+			} else {
+				// Simple diagonal downward slash
+
+				// Create a simple curve for the slash: start at top, go down diagonally, then
+				// back up
+				// Using a sine wave to create a smooth up-down motion
+				float verticalOffset = (float) Math.sin(swordAnimationProgress * Math.PI);
+
+				// Calculate positions:
+				// Start from original position, go down diagonally to the left, then back up
+				float xOffset = -0.2f - (verticalOffset * -0.2f); // Move left as goes down
+				float yOffset = 0.15f - (verticalOffset * 0.2f); // Move down then up
+				float zOffset = 0.1f + (swordAnimationProgress * 0.1f); // Move slightly forward throughout
+
+				Vector3f swordOffset = new Vector3f(xOffset, yOffset, zOffset);
+				Matrix4f swordLocalTranslation = (new Matrix4f()).translation(swordOffset);
+				sword.setLocalTranslation(swordLocalTranslation);
+
+				// Rotate the sword to follow the diagonal path
+				// Start with original rotation (vertical), then tilt as it moves
+				float tiltAngle = (float) Math.toRadians(-30.0f * verticalOffset); // Tilt as it moves down
+				float twistAngle = (float) Math.toRadians(-45.0f * swordAnimationProgress); // Twist throughout
+
+				Matrix4f swordLocalRotation = new Matrix4f();
+				swordLocalRotation.rotationY((float) Math.toRadians(-90.0f)); // Start vertical
+				swordLocalRotation.rotateX(tiltAngle); // Tilt forward as it moves down
+				swordLocalRotation.rotateZ(twistAngle); // Twist slightly for diagonal motion
+
+				sword.setLocalRotation(swordLocalRotation);
+			}
+		}
+	}
+
 	private void activateShield() {
 		if (!shieldActive && !shieldOnCooldown) {
-			// Enable rendering to make it visible
-			shield.getRenderStates().enableRendering();
+			Vector3f shieldActiveOffset = new Vector3f(0.0f, 0.15f, 0.25f); // Original active position
+			Matrix4f shieldLocalTranslation = (new Matrix4f()).translation(shieldActiveOffset);
+			shield.setLocalTranslation(shieldLocalTranslation);
 
 			// Start tracking activation time
 			shieldActivationTime = System.currentTimeMillis();
@@ -686,7 +784,10 @@ public class MyGame extends VariableFrameRateGame {
 
 	private void deactivateShield() {
 		if (shieldActive) {
-			shield.getRenderStates().disableRendering();
+			Vector3f shieldInactiveOffset = new Vector3f(0.2f, 0.15f, 0.1f);
+			Matrix4f shieldLocalTranslation = (new Matrix4f()).translation(shieldInactiveOffset);
+			shield.setLocalTranslation(shieldLocalTranslation);
+
 			shieldActive = false;
 
 			shieldDeactivationTime = System.currentTimeMillis();
@@ -724,7 +825,10 @@ public class MyGame extends VariableFrameRateGame {
 		}
 
 		// Enable rendering to make it visible
-		hitbox.getRenderStates().enableRendering();
+		// hitbox.getRenderStates().enableRendering();
+
+		swordAnimating = true;
+		swordAnimationProgress = 0.0f;
 
 		// Start tracking activation time
 		hitboxActivationTime = System.currentTimeMillis();
@@ -732,13 +836,17 @@ public class MyGame extends VariableFrameRateGame {
 
 		lastAttackTime = currentTime;
 
+		if (protClient != null && isClientConnected) {
+			protClient.sendSwordAnimationMessage();
+		}
+
 		System.out.println("Hitbox activated");
 	}
 
 	private void checkHitboxStatus() {
 		if (hitboxActive && System.currentTimeMillis() - hitboxActivationTime > HITBOX_DURATION) {
 			// Deactivate the hitbox
-			hitbox.getRenderStates().disableRendering();
+			// hitbox.getRenderStates().disableRendering();
 			hitboxActive = false;
 			System.out.println("Hitbox deactivated");
 		}

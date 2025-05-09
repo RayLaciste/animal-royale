@@ -83,6 +83,7 @@ public class GhostManager {
 		newAvatar.setLocalScale(initialScale);
 
 		newAvatar.createShield(game.getShieldShape(), game.getShieldTexture());
+		newAvatar.createSword(game.getSwordShape(), game.getSwordTexture());
 
 		ghostAvatars.add(newAvatar);
 	}
@@ -158,6 +159,16 @@ public class GhostManager {
 	public void update(float elapsedTime) {
 		for (GhostAvatar avatar : ghostAvatars) {
 			avatar.update(elapsedTime);
+		}
+	}
+
+	// ^ ========================= Sword Stuff ========================= ^ //
+	public void triggerGhostSwordAnimation(UUID id) {
+		GhostAvatar ghostAvatar = findAvatar(id);
+		if (ghostAvatar != null) {
+			ghostAvatar.startSwordAnimation();
+		} else {
+			System.out.println("tried to trigger ghost sword animation, but unable to find ghost in list");
 		}
 	}
 }
