@@ -4,7 +4,9 @@ import java.util.UUID;
 
 import tage.*;
 import org.joml.*;
+import tage.shapes.AnimatedShape;
 import tage.shapes.Cube;
+import java.lang.Math;
 
 // A ghost MUST be connected as a child of the root,
 // so that it will be rendered, and for future removal.
@@ -52,7 +54,6 @@ public class GhostAvatar extends GameObject {
 		return getWorldRotation();
 	}
 
-
 	// ^ ========================= Shield Stuff ========================= ^ //
 	public void createShield(ObjShape shieldShape, TextureImage shieldTexture) {
 		shield = new GameObject(this, shieldShape, shieldTexture);
@@ -60,20 +61,25 @@ public class GhostAvatar extends GameObject {
 		shield.propagateRotation(true);
 		shield.applyParentRotationToPosition(true);
 
-		Vector3f shieldLocalOffset = new Vector3f(0.2f, 0.15f, 0.1f);
+		Vector3f shieldLocalOffset = new Vector3f(0.3f, -0.25f, 0.1f);
 		Matrix4f shieldLocalTranslation = (new Matrix4f()).translation(shieldLocalOffset);
 		shield.setLocalTranslation(shieldLocalTranslation);
 
-		Matrix4f shieldScale = (new Matrix4f()).scaling(0.25f);
+		Matrix4f shieldLocalRotation = (new Matrix4f()).rotateY((float) java.lang.Math.toRadians(30.0f));
+		shield.setLocalRotation(shieldLocalRotation);
+
+		Matrix4f shieldScale = (new Matrix4f()).scaling(0.75f);
 		shield.setLocalScale(shieldScale);
 
 	}
 
 	public void activateShield() {
 		if (shield != null) {
-			Vector3f shieldActiveOffset = new Vector3f(0.0f, 0.15f, 0.25f);
+			Vector3f shieldActiveOffset = new Vector3f(0.0f, 0.0f, 0.25f);
 			Matrix4f shieldLocalTranslation = (new Matrix4f()).translation(shieldActiveOffset);
 			shield.setLocalTranslation(shieldLocalTranslation);
+			Matrix4f shieldLocalRotation = (new Matrix4f()).rotationY((float) java.lang.Math.toRadians(0.0f));
+			shield.setLocalRotation(shieldLocalRotation);
 
 			shieldActive = true;
 		}
@@ -81,9 +87,11 @@ public class GhostAvatar extends GameObject {
 
 	public void deactivateShield() {
 		if (shield != null) {
-			Vector3f shieldInactiveOffset = new Vector3f(0.2f, 0.15f, 0.1f);
+			Vector3f shieldInactiveOffset = new Vector3f(0.3f, -0.25f, 0.1f);
 			Matrix4f shieldLocalTranslation = (new Matrix4f()).translation(shieldInactiveOffset);
 			shield.setLocalTranslation(shieldLocalTranslation);
+			Matrix4f shieldLocalRotation = (new Matrix4f()).rotateY((float) java.lang.Math.toRadians(30.0f));
+			shield.setLocalRotation(shieldLocalRotation);
 
 			shieldActive = false;
 		}
@@ -107,14 +115,14 @@ public class GhostAvatar extends GameObject {
 		sword.propagateRotation(true);
 		sword.applyParentRotationToPosition(true);
 
-		Vector3f swordOffset = new Vector3f(-0.2f, 0.15f, 0.1f);
+		Vector3f swordOffset = new Vector3f(-0.25f, -0.15f, 0.1f);
 		Matrix4f swordLocalTranslation = (new Matrix4f()).translation(swordOffset);
 		sword.setLocalTranslation(swordLocalTranslation);
 
 		Matrix4f swordLocalRotation = (new Matrix4f()).rotationY((float) java.lang.Math.toRadians(-90.0f));
 		sword.setLocalRotation(swordLocalRotation);
 
-		Matrix4f swordScale = (new Matrix4f()).scaling(0.75f);
+		Matrix4f swordScale = (new Matrix4f()).scaling(2.75f);
 		sword.setLocalScale(swordScale);
 	}
 
@@ -126,50 +134,62 @@ public class GhostAvatar extends GameObject {
 	}
 
 	private void updateSwordAnimation(float elapsedTimeSeconds) {
-		if (sword != null && swordAnimating) {
+		if (swordAnimating) {
 			// Update animation progress
 			swordAnimationProgress += SWORD_ANIMATION_SPEED * elapsedTimeSeconds;
 
 			if (swordAnimationProgress >= 1.0f) {
-				// Animation complete - return to original position
+				// Animation complete
 				swordAnimating = false;
 				swordAnimationProgress = 0.0f;
 
-				// Reset sword to original position (pointing up)
-				Vector3f swordOffset = new Vector3f(-0.2f, 0.15f, 0.1f);
-				Matrix4f swordLocalTranslation = (new Matrix4f()).translation(swordOffset);
-				sword.setLocalTranslation(swordLocalTranslation);
+				// Reset to original position
+				Vector3f swordOffset = new Vector3f(-0.25f, -0.2f, 0.1f);
+				sword.setLocalTranslation(new Matrix4f().translation(swordOffset));
 
-				// Reset to original rotation (pointing up)
-				Matrix4f swordLocalRotation = (new Matrix4f()).rotationY((float) java.lang.Math.toRadians(-90.0f));
-				sword.setLocalRotation(swordLocalRotation);
+				// Reset to original rotation
+				sword.setLocalRotation(new Matrix4f().rotationY((float) Math.toRadians(-90.0f)));
 			} else {
-				// Simple diagonal downward slash
-				// Using a sine wave to create a smooth up-down motion
-				float verticalOffset = (float) java.lang.Math.sin(swordAnimationProgress * java.lang.Math.PI);
+				// Simple swing down and up animation
+				// For the first half, swing down
+				// For the second half, swing back up
+				float angle;
 
-				// Calculate positions:
-				// Start from original position, go down diagonally to the left, then back up
-				float xOffset = -0.2f - (verticalOffset * -0.2f); // Move left as goes down
-				float yOffset = 0.15f - (verticalOffset * 0.2f); // Move down then up
-				float zOffset = 0.1f + (swordAnimationProgress * 0.1f); // Move slightly forward throughout
+				if (swordAnimationProgress < 0.5f) {
+					// First half - swing down (0 to 60 degrees)
+					angle = 90.0f * (swordAnimationProgress * 2);
+				} else {
+					// Second half - swing back up (60 to 0 degrees)
+					angle = 90.0f * (1 - (swordAnimationProgress - 0.5f) * 2);
+				}
 
-				Vector3f swordOffset = new Vector3f(xOffset, yOffset, zOffset);
-				Matrix4f swordLocalTranslation = (new Matrix4f()).translation(swordOffset);
-				sword.setLocalTranslation(swordLocalTranslation);
+				// Apply rotation around X axis (swing down/up)
+				Matrix4f rotation = new Matrix4f()
+						.rotationY((float) Math.toRadians(-90.0f))
+						.rotateZ((float) Math.toRadians(-angle));
 
-				// Rotate the sword to follow the diagonal path
-				float tiltAngle = (float) java.lang.Math.toRadians(-30.0f * verticalOffset); // Tilt as it moves down
-				float twistAngle = (float) java.lang.Math.toRadians(-45.0f * swordAnimationProgress); // Twist
-																										// throughout
-
-				Matrix4f swordLocalRotation = new Matrix4f();
-				swordLocalRotation.rotationY((float) java.lang.Math.toRadians(-90.0f)); // Start vertical
-				swordLocalRotation.rotateX(tiltAngle); // Tilt forward as it moves down
-				swordLocalRotation.rotateZ(twistAngle); // Twist slightly for diagonal motion
-
-				sword.setLocalRotation(swordLocalRotation);
+				sword.setLocalRotation(rotation);
 			}
+		}
+	}
+
+	// ^ ========================= Animation Stuff ========================= ^ //
+	private boolean isAnimating = false;
+
+	public void startRunAnimation() {
+		if (this.getShape() instanceof AnimatedShape) {
+			AnimatedShape animShape = (AnimatedShape) this.getShape();
+			animShape.stopAnimation();
+			animShape.playAnimation("RUN", 0.5f, AnimatedShape.EndType.LOOP, 0);
+			isAnimating = true;
+		}
+	}
+
+	public void stopAnimation() {
+		if (this.getShape() instanceof AnimatedShape) {
+			AnimatedShape animShape = (AnimatedShape) this.getShape();
+			animShape.stopAnimation();
+			isAnimating = false;
 		}
 	}
 
@@ -184,6 +204,10 @@ public class GhostAvatar extends GameObject {
 		}
 
 		updateSwordAnimation(elapsedTime / 1000.0f);
+
+		if (this.getShape() instanceof AnimatedShape) {
+			((AnimatedShape) this.getShape()).updateAnimation();
+		}
 	}
 
 }

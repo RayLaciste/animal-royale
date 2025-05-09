@@ -79,8 +79,15 @@ public class GhostManager {
 		ObjShape s = game.getGhostShape();
 		TextureImage t = game.getGhostTexture();
 		GhostAvatar newAvatar = new GhostAvatar(id, s, t, position);
-		Matrix4f initialScale = (new Matrix4f()).scaling(0.25f);
+
+		Matrix4f initialScale = (new Matrix4f()).scaling(0.20f);
 		newAvatar.setLocalScale(initialScale);
+
+		newAvatar.getRenderStates().setModelOrientationCorrection(
+				(new Matrix4f()).rotationY((float) java.lang.Math.toRadians(-90.0f)));
+
+		Matrix4f initialRotation = (new Matrix4f()).rotationY((float) java.lang.Math.toRadians(135.0f));
+		newAvatar.setLocalRotation(initialRotation);
 
 		newAvatar.createShield(game.getShieldShape(), game.getShieldTexture());
 		newAvatar.createSword(game.getSwordShape(), game.getSwordTexture());

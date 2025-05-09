@@ -49,6 +49,18 @@ public class MyGame extends VariableFrameRateGame {
 	private TextureImage doltx, ghostT, metalTx;
 	private Light light;
 
+	private AnimatedShape frogS;
+	private TextureImage frogTx;
+	private float frogHeightAdjust = 0.65f;
+
+	public AnimatedShape getFrogShape() {
+		return frogS;
+	}
+
+	public TextureImage getFrogTexture() {
+		return frogTx;
+	}
+
 	// ground
 	private GameObject terr;
 	private ObjShape terrS;
@@ -200,11 +212,6 @@ public class MyGame extends VariableFrameRateGame {
 		oofSound.setMaxDistance(10.0f);
 		oofSound.setMinDistance(0.5f);
 		oofSound.setRollOff(5.0f);
-		// Optional: Load a hit sound as well
-		// AudioResource hitResource = audioMgr.createAudioResource("hit.wav",
-		// AudioResourceType.AUDIO_SAMPLE);
-		// hitSound = new Sound(hitResource, SoundType.SOUND_EFFECT, 100, false);
-		// hitSound.initialize(audioMgr);
 	}
 
 	@Override
@@ -213,7 +220,13 @@ public class MyGame extends VariableFrameRateGame {
 
 		dolS = new ImportedModel("dolphinHighPoly.obj");
 
-		ghostS = dolS;
+		frogS = new AnimatedShape("frog.rkm", "frog.rks");
+		frogS.loadAnimation("RUN", "run.rka");
+		frogS.loadAnimation("HELLO", "hello.rka");
+
+		// ! CHANGE THIS
+		// ghost models
+		ghostS = frogS;
 
 		// terrain
 		terrS = new TerrainPlane(1000);
@@ -238,7 +251,7 @@ public class MyGame extends VariableFrameRateGame {
 	@Override
 	public void loadTextures() {
 		doltx = new TextureImage("Dolphin_HighPolyUV.png");
-		ghostT = new TextureImage("redDolphin.jpg");
+		ghostT = new TextureImage("bear.png");
 		groundTx = new TextureImage("grass.png");
 		npcTex = new TextureImage("frog.png");
 		heightMapTx = new TextureImage("terrain.png");
@@ -246,6 +259,7 @@ public class MyGame extends VariableFrameRateGame {
 		metalTx = new TextureImage("metal.jpg");
 		shieldTx = new TextureImage("shield.png");
 		swordTx = new TextureImage("metal.jpg"); // ! change
+		frogTx = new TextureImage("frog.png");
 	}
 
 	@Override
@@ -260,13 +274,26 @@ public class MyGame extends VariableFrameRateGame {
 		Matrix4f initialTranslation, initialRotation, initialScale;
 
 		// build dolphin avatar
-		avatar = new GameObject(GameObject.root(), dolS, doltx);
-		initialTranslation = (new Matrix4f()).translation(-1f, 0f, 1f);
+		// avatar = new GameObject(GameObject.root(), dolS, doltx);
+		// initialTranslation = (new Matrix4f()).translation(-1f, 0f, 1f);
+		// avatar.setLocalTranslation(initialTranslation);
+		// initialRotation = (new Matrix4f()).rotationY((float)
+		// java.lang.Math.toRadians(135.0f));
+		// avatar.setLocalRotation(initialRotation);
+		// initialScale = (new Matrix4f()).scaling(0.5f);
+		// avatar.setLocalScale(initialScale);
+
+		// Frog avatar
+		avatar = new GameObject(GameObject.root(), frogS, frogTx);
+		initialTranslation = (new Matrix4f()).translation(-1f, frogHeightAdjust, 1f);
 		avatar.setLocalTranslation(initialTranslation);
 		initialRotation = (new Matrix4f()).rotationY((float) java.lang.Math.toRadians(135.0f));
 		avatar.setLocalRotation(initialRotation);
-		initialScale = (new Matrix4f()).scaling(0.5f);
+		initialScale = (new Matrix4f()).scaling(0.20f);
 		avatar.setLocalScale(initialScale);
+
+		avatar.getRenderStates().setModelOrientationCorrection(
+				(new Matrix4f()).rotationY((float) java.lang.Math.toRadians(-90.0f)));
 
 		// hitbox stuff
 		hitbox = new GameObject(avatar, new Cube(), sphereTx);
@@ -274,13 +301,14 @@ public class MyGame extends VariableFrameRateGame {
 		hitbox.propagateRotation(true);
 		hitbox.applyParentRotationToPosition(true);
 
-		Vector3f hitboxOffset = new Vector3f(0.0f, 0.15f, 0.25f);
+		Vector3f hitboxOffset = new Vector3f(0.0f, 0.0f, 0.15f);
 		Matrix4f hitboxLocalTranslation = (new Matrix4f()).translation(hitboxOffset);
 		hitbox.setLocalTranslation(hitboxLocalTranslation);
 
-		Matrix4f hitboxScale = (new Matrix4f()).scaling(0.25f);
+		Matrix4f hitboxScale = (new Matrix4f()).scaling(1.25f);
 		hitbox.setLocalScale(hitboxScale);
 
+		// make hitbox invisible
 		hitbox.getRenderStates().disableRendering();
 
 		// shield stuff
@@ -289,11 +317,12 @@ public class MyGame extends VariableFrameRateGame {
 		shield.propagateRotation(true);
 		shield.applyParentRotationToPosition(true);
 
-		Vector3f shieldLocalOffset = new Vector3f(0.2f, 0.15f, 0.1f);
+		Vector3f shieldLocalOffset = new Vector3f(0.3f, -0.25f, 0.1f);
 		Matrix4f shieldLocalTranslation = (new Matrix4f()).translation(shieldLocalOffset);
 		shield.setLocalTranslation(shieldLocalTranslation);
-
-		Matrix4f shieldHitboxScale = (new Matrix4f()).scaling(0.2f);
+		initialRotation = (new Matrix4f()).rotateY((float) java.lang.Math.toRadians(30.0f));
+		shield.setLocalRotation(initialRotation);
+		Matrix4f shieldHitboxScale = (new Matrix4f()).scaling(0.75f);
 		shield.setLocalScale(shieldHitboxScale);
 
 		// sword stuff
@@ -302,14 +331,14 @@ public class MyGame extends VariableFrameRateGame {
 		sword.propagateRotation(true);
 		sword.applyParentRotationToPosition(true);
 
-		Vector3f swordOffset = new Vector3f(-0.2f, 0.15f, 0.1f);
+		Vector3f swordOffset = new Vector3f(-0.25f, -0.15f, 0.1f);
 		Matrix4f swordLocalTranslation = (new Matrix4f()).translation(swordOffset);
 		sword.setLocalTranslation(swordLocalTranslation);
 
 		Matrix4f swordLocalRotation = (new Matrix4f()).rotationY((float) Math.toRadians(-90.0f));
 		sword.setLocalRotation(swordLocalRotation);
 
-		Matrix4f swordScale = (new Matrix4f()).scaling(0.75f);
+		Matrix4f swordScale = (new Matrix4f()).scaling(2.75f);
 		sword.setLocalScale(swordScale);
 
 		// build torus along X axis
@@ -415,6 +444,10 @@ public class MyGame extends VariableFrameRateGame {
 	@Override
 	public void update() {
 		updateHUDDisplays();
+
+		// ^ =============== animations ===============
+		frogS.updateAnimation();
+
 		// ^ =============== time setup ===============
 		elapsedTime = System.currentTimeMillis() - prevTime;
 		prevTime = System.currentTimeMillis();
@@ -546,7 +579,7 @@ public class MyGame extends VariableFrameRateGame {
 		// ^ =============== Position Updates ===============
 		Vector3f loc = avatar.getWorldLocation();
 		float height = terr.getHeight(loc.x(), loc.z());
-		avatar.setLocalLocation(new Vector3f(loc.x(), height, loc.z()));
+		avatar.setLocalLocation(new Vector3f(loc.x(), height + frogHeightAdjust, loc.z()));
 
 		positionCameraBehindAvatar();
 		processNetworking((float) elapsedTime);
@@ -619,9 +652,9 @@ public class MyGame extends VariableFrameRateGame {
 	}
 
 	private void positionCameraBehindAvatar() {
-		Vector4f u = new Vector4f(-1f, 0f, 0f, 1f);
-		Vector4f v = new Vector4f(0f, 1f, 0f, 1f);
-		Vector4f n = new Vector4f(0f, 0f, 1f, 1f);
+		Vector4f u = new Vector4f(-1.5f, 0f, 0f, 1f);
+		Vector4f v = new Vector4f(0f, 1.5f, 0f, 1f);
+		Vector4f n = new Vector4f(0f, 0f, 1.5f, 1f);
 		u.mul(avatar.getWorldRotation());
 		v.mul(avatar.getWorldRotation());
 		n.mul(avatar.getWorldRotation());
@@ -641,6 +674,16 @@ public class MyGame extends VariableFrameRateGame {
 		switch (e.getKeyCode()) {
 			case KeyEvent.VK_Q: {
 				qKeyHeld = true;
+				break;
+			}
+			case KeyEvent.VK_W: {
+				frogS.stopAnimation();
+				frogS.playAnimation("RUN", 0.5f, AnimatedShape.EndType.LOOP, 0);
+				break;
+			}
+			case KeyEvent.VK_H: {
+				frogS.stopAnimation();
+				frogS.playAnimation("HELLO", 0.5f, AnimatedShape.EndType.LOOP, 0);
 				break;
 			}
 			case KeyEvent.VK_R: {
@@ -700,6 +743,10 @@ public class MyGame extends VariableFrameRateGame {
 	@Override
 	public void keyReleased(KeyEvent e) {
 		switch (e.getKeyCode()) {
+			case KeyEvent.VK_W: {
+				frogS.stopAnimation();
+				break;
+			}
 			case KeyEvent.VK_Q: {
 				qKeyHeld = false;
 				break;
@@ -714,56 +761,47 @@ public class MyGame extends VariableFrameRateGame {
 			swordAnimationProgress += SWORD_ANIMATION_SPEED * elapsedTimeSeconds;
 
 			if (swordAnimationProgress >= 1.0f) {
-				// Animation complete - return to original position
+				// Animation complete
 				swordAnimating = false;
 				swordAnimationProgress = 0.0f;
 
-				// Reset sword to original position (pointing up)
-				Vector3f swordOffset = new Vector3f(-0.2f, 0.15f, 0.1f);
-				Matrix4f swordLocalTranslation = (new Matrix4f()).translation(swordOffset);
-				sword.setLocalTranslation(swordLocalTranslation);
+				// Reset to original position
+				Vector3f swordOffset = new Vector3f(-0.25f, -0.2f, 0.1f);
+				sword.setLocalTranslation(new Matrix4f().translation(swordOffset));
 
-				// Reset to original rotation (pointing up)
-				Matrix4f swordLocalRotation = (new Matrix4f()).rotationY((float) Math.toRadians(-90.0f));
-				sword.setLocalRotation(swordLocalRotation);
+				// Reset to original rotation
+				sword.setLocalRotation(new Matrix4f().rotationY((float) Math.toRadians(-90.0f)));
 			} else {
-				// Simple diagonal downward slash
+				// Simple swing down and up animation
+				// For the first half, swing down
+				// For the second half, swing back up
+				float angle;
 
-				// Create a simple curve for the slash: start at top, go down diagonally, then
-				// back up
-				// Using a sine wave to create a smooth up-down motion
-				float verticalOffset = (float) Math.sin(swordAnimationProgress * Math.PI);
+				if (swordAnimationProgress < 0.5f) {
+					// First half - swing down (0 to 60 degrees)
+					angle = 90.0f * (swordAnimationProgress * 2);
+				} else {
+					// Second half - swing back up (60 to 0 degrees)
+					angle = 90.0f * (1 - (swordAnimationProgress - 0.5f) * 2);
+				}
 
-				// Calculate positions:
-				// Start from original position, go down diagonally to the left, then back up
-				float xOffset = -0.2f - (verticalOffset * -0.2f); // Move left as goes down
-				float yOffset = 0.15f - (verticalOffset * 0.2f); // Move down then up
-				float zOffset = 0.1f + (swordAnimationProgress * 0.1f); // Move slightly forward throughout
+				// Apply rotation around X axis (swing down/up)
+				Matrix4f rotation = new Matrix4f()
+						.rotationY((float) Math.toRadians(-90.0f))
+						.rotateZ((float) Math.toRadians(-angle));
 
-				Vector3f swordOffset = new Vector3f(xOffset, yOffset, zOffset);
-				Matrix4f swordLocalTranslation = (new Matrix4f()).translation(swordOffset);
-				sword.setLocalTranslation(swordLocalTranslation);
-
-				// Rotate the sword to follow the diagonal path
-				// Start with original rotation (vertical), then tilt as it moves
-				float tiltAngle = (float) Math.toRadians(-30.0f * verticalOffset); // Tilt as it moves down
-				float twistAngle = (float) Math.toRadians(-45.0f * swordAnimationProgress); // Twist throughout
-
-				Matrix4f swordLocalRotation = new Matrix4f();
-				swordLocalRotation.rotationY((float) Math.toRadians(-90.0f)); // Start vertical
-				swordLocalRotation.rotateX(tiltAngle); // Tilt forward as it moves down
-				swordLocalRotation.rotateZ(twistAngle); // Twist slightly for diagonal motion
-
-				sword.setLocalRotation(swordLocalRotation);
+				sword.setLocalRotation(rotation);
 			}
 		}
 	}
 
 	private void activateShield() {
 		if (!shieldActive && !shieldOnCooldown) {
-			Vector3f shieldActiveOffset = new Vector3f(0.0f, 0.15f, 0.25f); // Original active position
+			Vector3f shieldActiveOffset = new Vector3f(0.0f, 0f, 0.25f); // Original active position
 			Matrix4f shieldLocalTranslation = (new Matrix4f()).translation(shieldActiveOffset);
 			shield.setLocalTranslation(shieldLocalTranslation);
+			Matrix4f shieldLocalRotation = (new Matrix4f()).rotationY((float) Math.toRadians(0.0f));
+			shield.setLocalRotation(shieldLocalRotation);
 
 			// Start tracking activation time
 			shieldActivationTime = System.currentTimeMillis();
@@ -784,10 +822,11 @@ public class MyGame extends VariableFrameRateGame {
 
 	private void deactivateShield() {
 		if (shieldActive) {
-			Vector3f shieldInactiveOffset = new Vector3f(0.2f, 0.15f, 0.1f);
+			Vector3f shieldInactiveOffset = new Vector3f(0.3f, -0.25f, 0.1f);
 			Matrix4f shieldLocalTranslation = (new Matrix4f()).translation(shieldInactiveOffset);
 			shield.setLocalTranslation(shieldLocalTranslation);
-
+			Matrix4f shieldLocalRotation = (new Matrix4f()).rotateY((float) Math.toRadians(30.0f));
+			shield.setLocalRotation(shieldLocalRotation);
 			shieldActive = false;
 
 			shieldDeactivationTime = System.currentTimeMillis();

@@ -23,7 +23,7 @@ public class FwdAction extends AbstractInputAction {
 		oldPosition = av.getWorldLocation();
 		fwdDirection = new Vector4f(0f, 0f, 1f, 1f);
 		fwdDirection.mul(av.getWorldRotation());
-		fwdDirection.mul(0.0015f * time);
+		fwdDirection.mul(0.0035f * time);
 		newPosition = oldPosition.add(fwdDirection.x(), fwdDirection.y(), fwdDirection.z());
 		av.setLocalLocation(newPosition);
 		if (protClient != null) {
