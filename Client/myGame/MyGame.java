@@ -119,6 +119,16 @@ public class MyGame extends VariableFrameRateGame {
 	private long shieldDeactivationTime = 0;
 	private final long SHIELD_COOLDOWN = 1500; // 1.5 seconds cooldown
 	private boolean shieldOnCooldown = false;
+	private long shieldHitTime = 0;
+	private final long SHIELD_HIT_FLASH_DURATION = 200;
+
+	public TextureImage getShieldTexture() {
+		return shield.getTextureImage();
+	}
+
+	public ObjShape getShieldShape() {
+		return shield.getShape();
+	}
 
 	public MyGame(String serverAddress, int serverPort, String protocol) {
 		super();
@@ -391,6 +401,14 @@ public class MyGame extends VariableFrameRateGame {
 		}
 		checkShieldStatus();
 
+		if (shieldActive && shieldHitTime > 0) {
+			long timeSinceHit = System.currentTimeMillis() - shieldHitTime;
+			if (timeSinceHit > SHIELD_HIT_FLASH_DURATION) {
+				shield.getRenderStates().setColor(new Vector3f(1.0f, 1.0f, 1.0f)); // Reset color
+				shieldHitTime = 0;
+			}
+		}
+
 		// ^ =============== Physics / Projectiles ===============
 		// * Projectile
 		checkBallBoundary();
@@ -597,6 +615,10 @@ public class MyGame extends VariableFrameRateGame {
 			shieldActivationTime = System.currentTimeMillis();
 			shieldActive = true;
 
+			if (protClient != null && isClientConnected) {
+				protClient.sendShieldActivateMessage();
+			}
+
 			System.out.println("Shield activated");
 		} else if (shieldOnCooldown) {
 			// Calculate remaining cooldown time in seconds
@@ -613,6 +635,10 @@ public class MyGame extends VariableFrameRateGame {
 
 			shieldDeactivationTime = System.currentTimeMillis();
 			shieldOnCooldown = true;
+
+			if (protClient != null && isClientConnected) {
+				protClient.sendShieldDeactivateMessage();
+			}
 
 			System.out.println("Shield deactivated and on cooldown");
 		}
@@ -717,6 +743,19 @@ public class MyGame extends VariableFrameRateGame {
 	}
 
 	public void handlePlayerHit() {
+		if (shieldActive) {
+			System.out.println("Hit blocked by shield!");
+
+			shield.getRenderStates().setColor(new Vector3f(1.0f, 0.0f, 0.0f));
+			shieldHitTime = System.currentTimeMillis();
+
+			if (protClient != null && isClientConnected) {
+				protClient.sendShieldHitMessage();
+			}
+
+			return; // Exit the method without taking damage
+		}
+
 		// Only apply damage if not already invulnerable
 		if (!isInvulnerable) {
 			playerHealth--;
@@ -907,6 +946,21 @@ public class MyGame extends VariableFrameRateGame {
 	}
 
 	private void handlePlayerHit(UUID ballId, UUID throwerId) {
+		if (shieldActive) {
+			System.out.println("Ball hit blocked by shield!");
+
+			shield.getRenderStates().setColor(new Vector3f(1.0f, 0.0f, 0.0f));
+			shieldHitTime = System.currentTimeMillis();
+
+			if (protClient != null && isClientConnected) {
+				protClient.sendShieldHitMessage();
+			}
+
+			// Remove the ghost ball even though no damage was taken
+			gm.removeGhostBall(ballId);
+			return; // Exit without taking damage
+		}
+
 		// Reduce health
 		playerHealth--;
 		System.out.println("Player hit! Health reduced to: " + playerHealth);

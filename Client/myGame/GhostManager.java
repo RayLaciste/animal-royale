@@ -61,7 +61,6 @@ public class GhostManager {
 		return null;
 	}
 
-	// Add method to clean up expired ghost balls
 	public void cleanupExpiredBalls(long maxLifetime) {
 		long currentTime = System.currentTimeMillis();
 		Iterator<GhostBall> it = ghostBalls.iterator();
@@ -82,6 +81,9 @@ public class GhostManager {
 		GhostAvatar newAvatar = new GhostAvatar(id, s, t, position);
 		Matrix4f initialScale = (new Matrix4f()).scaling(0.25f);
 		newAvatar.setLocalScale(initialScale);
+
+		newAvatar.createShield(game.getShieldShape(), game.getShieldTexture());
+
 		ghostAvatars.add(newAvatar);
 	}
 
@@ -122,6 +124,40 @@ public class GhostManager {
 			ghostAvatar.setRotation(rotation);
 		} else {
 			System.out.println("tried to update ghost avatar rotation, but unable to find ghost in list");
+		}
+	}
+
+	// ^ ========================= Shield Stuff ========================= ^ //
+	public void activateGhostShield(UUID id) {
+		GhostAvatar ghostAvatar = findAvatar(id);
+		if (ghostAvatar != null) {
+			ghostAvatar.activateShield();
+		} else {
+			System.out.println("tried to activate ghost shield, but unable to find ghost in list");
+		}
+	}
+
+	public void deactivateGhostShield(UUID id) {
+		GhostAvatar ghostAvatar = findAvatar(id);
+		if (ghostAvatar != null) {
+			ghostAvatar.deactivateShield();
+		} else {
+			System.out.println("tried to deactivate ghost shield, but unable to find ghost in list");
+		}
+	}
+
+	public void triggerGhostShieldHitEffect(UUID id) {
+		GhostAvatar ghostAvatar = findAvatar(id);
+		if (ghostAvatar != null) {
+			ghostAvatar.triggerShieldHitEffect();
+		} else {
+			System.out.println("tried to trigger ghost shield hit effect, but unable to find ghost in list");
+		}
+	}
+
+	public void update(float elapsedTime) {
+		for (GhostAvatar avatar : ghostAvatars) {
+			avatar.update(elapsedTime);
 		}
 	}
 }

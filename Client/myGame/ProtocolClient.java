@@ -34,6 +34,11 @@ public class ProtocolClient extends GameConnectionClient {
 		System.out.println("message received -->" + strMessage);
 		String[] messageTokens = strMessage.split(",");
 
+		if (message == null) {
+			System.out.println("Warning: Received null message in processPacket - ignoring");
+			return;
+		}
+
 		// Game specific protocol to handle the message
 		if (messageTokens.length > 0) {
 			// Handle JOIN message
@@ -162,6 +167,22 @@ public class ProtocolClient extends GameConnectionClient {
 				if (targetID.equals(id)) {
 					game.handlePlayerHit();
 				}
+			}
+
+			// ^ ============================== Shield Stuff ==============================
+			if (messageTokens[0].compareTo("shield_activate") == 0) {
+				UUID ghostID = UUID.fromString(messageTokens[1]);
+				ghostManager.activateGhostShield(ghostID);
+			}
+
+			if (messageTokens[0].compareTo("shield_deactivate") == 0) {
+				UUID ghostID = UUID.fromString(messageTokens[1]);
+				ghostManager.deactivateGhostShield(ghostID);
+			}
+
+			if (messageTokens[0].compareTo("shield_hit") == 0) {
+				UUID ghostID = UUID.fromString(messageTokens[1]);
+				ghostManager.triggerGhostShieldHitEffect(ghostID);
 			}
 		}
 	}
@@ -298,6 +319,35 @@ public class ProtocolClient extends GameConnectionClient {
 			System.out.println("Sending hit player message for target: " + targetID);
 			String message = new String("hit," + targetID.toString());
 
+			sendPacket(message);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	// ^ ========================== Shield Stuff ========================== ^ //
+	public void sendShieldActivateMessage() {
+		try {
+			String message = new String("shield_activate," + id.toString());
+			sendPacket(message);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void sendShieldDeactivateMessage() {
+		try {
+			String message = new String("shield_deactivate," + id.toString());
+			sendPacket(message);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	// Add method to send shield hit effect
+	public void sendShieldHitMessage() {
+		try {
+			String message = new String("shield_hit," + id.toString());
 			sendPacket(message);
 		} catch (IOException e) {
 			e.printStackTrace();

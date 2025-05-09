@@ -112,6 +112,25 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 				System.out.println("Received hit message for target: " + targetID);
 				sendHitMessage(targetID);
 			}
+
+			// ^ ========================= Shield Stuff ========================= ^ //
+			if (messageTokens[0].compareTo("shield_activate") == 0) {
+				UUID clientID = UUID.fromString(messageTokens[1]);
+				sendShieldActivateMessages(clientID);
+			}
+
+			// Add processing for shield deactivate messages
+			if (messageTokens[0].compareTo("shield_deactivate") == 0) {
+				UUID clientID = UUID.fromString(messageTokens[1]);
+				sendShieldDeactivateMessages(clientID);
+			}
+
+			// Add processing for shield hit messages
+			if (messageTokens[0].compareTo("shield_hit") == 0) {
+				UUID clientID = UUID.fromString(messageTokens[1]);
+				sendShieldHitMessages(clientID);
+			}
+
 		}
 	}
 
@@ -285,7 +304,35 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 	public void sendHitMessage(UUID targetID) {
 		try {
 			String message = new String("hit," + targetID.toString());
-			forwardPacketToAll(message, null);
+			sendPacket(message, targetID);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	// ^ ========================= Shield Stuff ========================= ^ //
+	public void sendShieldActivateMessages(UUID clientID) {
+		try {
+			String message = new String("shield_activate," + clientID.toString());
+			forwardPacketToAll(message, clientID);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void sendShieldDeactivateMessages(UUID clientID) {
+		try {
+			String message = new String("shield_deactivate," + clientID.toString());
+			forwardPacketToAll(message, clientID);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void sendShieldHitMessages(UUID clientID) {
+		try {
+			String message = new String("shield_hit," + clientID.toString());
+			forwardPacketToAll(message, clientID);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
