@@ -173,7 +173,7 @@ public class MyGame extends VariableFrameRateGame {
 	// Sounds
 	private IAudioManager audioMgr;
 	private Sound blockSound;
-	private Sound slapSound, oofSound;
+	private Sound slapSound, oofSound, musicSound;
 
 	public MyGame(String serverAddress, int serverPort, String protocol, String playerTexture) {
 		super();
@@ -201,11 +201,16 @@ public class MyGame extends VariableFrameRateGame {
 	}
 
 	public void loadSounds() {
-		AudioResource blockResource, slapResource, oofResource;
+		AudioResource blockResource, slapResource, oofResource, musicResource;
 		audioMgr = engine.getAudioManager();
 
+		musicResource = audioMgr.createAudioResource("music.wav", AudioResourceType.AUDIO_SAMPLE);
+		musicSound = new Sound(musicResource, SoundType.SOUND_EFFECT, 60, true);
+		musicSound.initialize(audioMgr);
+		musicSound.play();
+
 		blockResource = audioMgr.createAudioResource("shield.wav", AudioResourceType.AUDIO_SAMPLE);
-		blockSound = new Sound(blockResource, SoundType.SOUND_EFFECT, 100, false);
+		blockSound = new Sound(blockResource, SoundType.SOUND_EFFECT, 50, false);
 		blockSound.initialize(audioMgr);
 
 		blockSound.setMaxDistance(10.0f);
@@ -213,7 +218,7 @@ public class MyGame extends VariableFrameRateGame {
 		blockSound.setRollOff(5.0f);
 
 		slapResource = audioMgr.createAudioResource("slap.wav", AudioResourceType.AUDIO_SAMPLE);
-		slapSound = new Sound(slapResource, SoundType.SOUND_EFFECT, 100, false);
+		slapSound = new Sound(slapResource, SoundType.SOUND_EFFECT, 60, false);
 		slapSound.initialize(audioMgr);
 
 		slapSound.setMaxDistance(10.0f);
@@ -221,7 +226,7 @@ public class MyGame extends VariableFrameRateGame {
 		slapSound.setRollOff(5.0f);
 
 		oofResource = audioMgr.createAudioResource("oof.wav", AudioResourceType.AUDIO_SAMPLE);
-		oofSound = new Sound(oofResource, SoundType.SOUND_EFFECT, 100, false);
+		oofSound = new Sound(oofResource, SoundType.SOUND_EFFECT, 60, false);
 		oofSound.initialize(audioMgr);
 
 		oofSound.setMaxDistance(10.0f);
@@ -1011,7 +1016,7 @@ public class MyGame extends VariableFrameRateGame {
 	private final long SPHERE_LIFETIME = 2500; // 2.5 seconds
 	private UUID sphereId = null;
 	private long lastBallThrowTime = 0;
-	private final long BALL_THROW_COOLDOWN = 1500;
+	private final long BALL_THROW_COOLDOWN = 3000; // 3 seconds
 
 	private void createThrowableSphere() {
 		if (sphereCreated) {
