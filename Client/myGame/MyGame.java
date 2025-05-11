@@ -33,8 +33,6 @@ import com.bulletphysics.collision.dispatch.CollisionObject;
 import tage.audio.*;
 
 public class MyGame extends VariableFrameRateGame {
-	JumpAction jumpAction;
-
 	private static Engine engine;
 	private InputManager im;
 	private GhostManager gm;
@@ -93,6 +91,7 @@ public class MyGame extends VariableFrameRateGame {
 	private ObjShape crateS;
 	private TextureImage crateTx;
 	private GameObject crate1, crate2, crate3, crate4;
+	private boolean cratesPositioned = false;
 
 	// physics
 	private PhysicsEngine physicsEngine;
@@ -297,10 +296,6 @@ public class MyGame extends VariableFrameRateGame {
 
 		// crates
 		crateS = new ImportedModel("crate.obj");
-
-		linxS = new Line(new Vector3f(0f, 0f, 0f), new Vector3f(3f, 0f, 0f));
-		linyS = new Line(new Vector3f(0f, 0f, 0f), new Vector3f(0f, 3f, 0f));
-		linzS = new Line(new Vector3f(0f, 0f, 0f), new Vector3f(0f, 0f, -3f));
 	}
 
 	@Override
@@ -310,7 +305,7 @@ public class MyGame extends VariableFrameRateGame {
 		heightMapTx = new TextureImage("terrain.png");
 		sphereTx = new TextureImage("water.jpg");
 		metalTx = new TextureImage("metal.jpg");
-		shieldTx = new TextureImage("metal.png");
+		shieldTx = new TextureImage("metal.jpg");
 		swordTx = new TextureImage("metal.jpg"); // ! change ?
 		frogTx = new TextureImage("frog.png");
 		bearTx = new TextureImage("bear.png");
@@ -331,16 +326,6 @@ public class MyGame extends VariableFrameRateGame {
 	public void buildObjects() {
 		Matrix4f initialTranslation, initialRotation, initialScale;
 		float quadrantSize = 10.0f;
-
-		// build dolphin avatar
-		// avatar = new GameObject(GameObject.root(), dolS, doltx);
-		// initialTranslation = (new Matrix4f()).translation(-1f, 0f, 1f);
-		// avatar.setLocalTranslation(initialTranslation);
-		// initialRotation = (new Matrix4f()).rotationY((float)
-		// java.lang.Math.toRadians(135.0f));
-		// avatar.setLocalRotation(initialRotation);
-		// initialScale = (new Matrix4f()).scaling(0.5f);
-		// avatar.setLocalScale(initialScale);
 
 		// Frog avatar
 		avatar = new GameObject(GameObject.root(), frogS, avatarTx);
@@ -400,13 +385,6 @@ public class MyGame extends VariableFrameRateGame {
 		Matrix4f swordScale = (new Matrix4f()).scaling(2.75f);
 		sword.setLocalScale(swordScale);
 
-		// build torus along X axis
-		tor = new GameObject(GameObject.root(), torS);
-		initialTranslation = (new Matrix4f()).translation(1, 0, 0);
-		tor.setLocalTranslation(initialTranslation);
-		initialScale = (new Matrix4f()).scaling(0.25f);
-		tor.setLocalScale(initialScale);
-
 		// Ground
 		terr = new GameObject(GameObject.root(), terrS, groundTx);
 		initialTranslation = (new Matrix4f()).translation(0f, 0f, 0f);
@@ -435,14 +413,6 @@ public class MyGame extends VariableFrameRateGame {
 		crate4 = new GameObject(GameObject.root(), crateS, crateTx);
 		crate4.setLocalTranslation(new Matrix4f().translation(quadrantSize / 2, 0.5f, quadrantSize / 2));
 		crate4.setLocalScale(new Matrix4f().scaling(0.5f));
-
-		// add X,Y,-Z axes
-		x = new GameObject(GameObject.root(), linxS);
-		y = new GameObject(GameObject.root(), linyS);
-		z = new GameObject(GameObject.root(), linzS);
-		(x.getRenderStates()).setColor(new Vector3f(1f, 0f, 0f));
-		(y.getRenderStates()).setColor(new Vector3f(0f, 1f, 0f));
-		(z.getRenderStates()).setColor(new Vector3f(0f, 0f, 1f));
 	}
 
 	@Override
@@ -452,7 +422,6 @@ public class MyGame extends VariableFrameRateGame {
 		light = new Light();
 		light.setLocation(new Vector3f(0f, 5f, 0f));
 		(engine.getSceneGraph()).addLight(light);
-		
 
 		redLight = new Light();
 		redLight.setType(Light.LightType.SPOTLIGHT);
@@ -535,21 +504,21 @@ public class MyGame extends VariableFrameRateGame {
 		TurnAction turnAction = new TurnAction(this, protClient);
 		BackwardAction backwardAction = new BackwardAction(this, protClient);
 		StrafeAction strafeAction = new StrafeAction(this, protClient);
-		jumpAction = new JumpAction(this, protClient);
+		DashAction dashAction = new DashAction(this);
+		ShieldAction shieldAction = new ShieldAction(this);
+		AttackAction attackAction = new AttackAction(this);
+		ThrowAction throwAction = new ThrowAction(this);
+		ReloadAction reloadAction = new ReloadAction(this);
 
-		// attach the action objects to keyboard and gamepad components
-		im.associateActionWithAllGamepads(
-				net.java.games.input.Component.Identifier.Button._1,
-				fwdAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
-		im.associateActionWithAllGamepads(
-				net.java.games.input.Component.Identifier.Axis.X,
-				turnAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+		String gpName = im.getFirstGamepadName();
+
+		// attach the action objects to keyboard
 		im.associateActionWithAllKeyboards(
 				net.java.games.input.Component.Identifier.Key.W,
 				fwdAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 		im.associateActionWithAllKeyboards(
 				net.java.games.input.Component.Identifier.Key.S,
-				backwardAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+				fwdAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 		im.associateActionWithAllKeyboards(
 				net.java.games.input.Component.Identifier.Key.A,
 				strafeAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
@@ -562,9 +531,57 @@ public class MyGame extends VariableFrameRateGame {
 		im.associateActionWithAllKeyboards(
 				net.java.games.input.Component.Identifier.Key.RIGHT,
 				turnAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
-		im.associateActionWithAllKeyboards(
-				net.java.games.input.Component.Identifier.Key.SPACE,
-				jumpAction, InputManager.INPUT_ACTION_TYPE.ON_PRESS_ONLY);
+
+		// im.associateActionWithAllKeyboards(
+		// net.java.games.input.Component.Identifier.Key.C,
+		// dashAction, InputManager.INPUT_ACTION_TYPE.ON_PRESS_ONLY);
+		// im.associateActionWithAllKeyboards(
+		// net.java.games.input.Component.Identifier.Key.Q,
+		// shieldAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+		// im.associateActionWithAllKeyboards(
+		// net.java.games.input.Component.Identifier.Key.E,
+		// attackAction, InputManager.INPUT_ACTION_TYPE.ON_PRESS_ONLY);
+		// im.associateActionWithAllKeyboards(
+		// net.java.games.input.Component.Identifier.Key.R,
+		// throwAction, InputManager.INPUT_ACTION_TYPE.ON_PRESS_ONLY);
+		// im.associateActionWithAllKeyboards(
+		// net.java.games.input.Component.Identifier.Key.F,
+		// reloadAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+
+		// attach the action objects to keyboard
+		if (gpName != null) {
+			System.out.println("Gamepad found: " + gpName);
+
+			// Movement
+			im.associateAction(gpName,
+					net.java.games.input.Component.Identifier.Axis.Y,
+					fwdAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+			im.associateAction(gpName,
+					net.java.games.input.Component.Identifier.Axis.X,
+					strafeAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+			im.associateAction(gpName,
+					net.java.games.input.Component.Identifier.Axis.Z,
+					turnAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+
+			// Combat/abilities
+			im.associateAction(gpName,
+					net.java.games.input.Component.Identifier.Button._0,
+					attackAction, InputManager.INPUT_ACTION_TYPE.ON_PRESS_ONLY);
+			im.associateAction(gpName,
+					net.java.games.input.Component.Identifier.Button._3,
+					throwAction, InputManager.INPUT_ACTION_TYPE.ON_PRESS_ONLY);
+			im.associateAction(gpName,
+					net.java.games.input.Component.Identifier.Button._2,
+					dashAction, InputManager.INPUT_ACTION_TYPE.ON_PRESS_ONLY);
+			im.associateAction(gpName,
+					net.java.games.input.Component.Identifier.Axis.RZ,
+					shieldAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+			im.associateAction(gpName,
+					net.java.games.input.Component.Identifier.Button._1,
+					reloadAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+		} else {
+			System.out.println("No gamepad found. Using keyboard controls only.");
+		}
 	}
 
 	public GameObject getAvatar() {
@@ -576,6 +593,17 @@ public class MyGame extends VariableFrameRateGame {
 		updateHUDDisplays();
 		updateProjectileAmmo();
 		updateDash((float) elapsedTime / 1000.0f);
+
+		if (!cratesPositioned) {
+			try {
+				if (terr != null && engine.getRenderSystem().getViewport("MAIN") != null) {
+					positionCratesOnTerrain();
+					cratesPositioned = true;
+				}
+			} catch (Exception e) {
+			}
+		}
+
 		// ^ =============== animations ===============
 		frogS.updateAnimation();
 
@@ -632,10 +660,6 @@ public class MyGame extends VariableFrameRateGame {
 
 		// * input manager
 		im.update((float) elapsedTime);
-
-		if (jumpAction != null) {
-			jumpAction.update();
-		}
 
 		// * hitbox
 		if (hitboxActive) {
@@ -877,7 +901,7 @@ public class MyGame extends VariableFrameRateGame {
 			}
 			case KeyEvent.VK_H: {
 				frogS.stopAnimation();
-				frogS.playAnimation("HELLO", 0.5f, AnimatedShape.EndType.LOOP, 0);
+				frogS.playAnimation("HELLO", 0.25f, AnimatedShape.EndType.NONE, 0);
 				break;
 			}
 			case KeyEvent.VK_R: {
@@ -967,7 +991,7 @@ public class MyGame extends VariableFrameRateGame {
 	}
 
 	// * ---------- DASH SECTION ----------------
-	private void startDash() {
+	public void startDash() {
 		if (isDashing) {
 			return;
 		}
@@ -1189,7 +1213,7 @@ public class MyGame extends VariableFrameRateGame {
 		}
 	}
 
-	private void activateHitbox() {
+	public void activateHitbox() {
 		long currentTime = System.currentTimeMillis();
 
 		// Check if attack is on cooldown
@@ -1332,7 +1356,7 @@ public class MyGame extends VariableFrameRateGame {
 	private long lastBallThrowTime = 0;
 	private final long BALL_THROW_COOLDOWN = 3000; // 3 seconds
 
-	private void createThrowableSphere() {
+	public void createThrowableSphere() {
 		if (projectileAmmo <= 0) {
 			System.out.println("Out of ammo! Find a crate to reload (F key).");
 			return;
@@ -1696,5 +1720,41 @@ public class MyGame extends VariableFrameRateGame {
 				protClient.sendByeMessage();
 			}
 		}
+	}
+
+	private void positionCratesOnTerrain() {
+		float quadrantSize = 15.0f;
+
+		Vector3f crate1Pos = crate1.getWorldLocation();
+		float crate1Height = terr.getHeight(crate1Pos.x(), crate1Pos.z());
+		crate1.setLocalTranslation(new Matrix4f().translation(crate1Pos.x(), crate1Height, crate1Pos.z()));
+
+		Vector3f crate2Pos = crate2.getWorldLocation();
+		float crate2Height = terr.getHeight(crate2Pos.x(), crate2Pos.z());
+		crate2.setLocalTranslation(new Matrix4f().translation(crate2Pos.x(), crate2Height, crate2Pos.z()));
+
+		Vector3f crate3Pos = crate3.getWorldLocation();
+		float crate3Height = terr.getHeight(crate3Pos.x(), crate3Pos.z());
+		crate3.setLocalTranslation(new Matrix4f().translation(crate3Pos.x(), crate3Height, crate3Pos.z()));
+
+		Vector3f crate4Pos = crate4.getWorldLocation();
+		float crate4Height = terr.getHeight(crate4Pos.x(), crate4Pos.z());
+		crate4.setLocalTranslation(new Matrix4f().translation(crate4Pos.x(), crate4Height, crate4Pos.z()));
+
+		redLight.setLocation(crate1.getWorldLocation().add(crate1.getLocalUpVector().mul(1.5f)));
+		redLight1.setLocation(crate2.getWorldLocation().add(crate2.getLocalUpVector().mul(1.5f)));
+		redLight2.setLocation(crate3.getWorldLocation().add(crate3.getLocalUpVector().mul(1.5f)));
+		redLight3.setLocation(crate4.getWorldLocation().add(crate4.getLocalUpVector().mul(1.5f)));
+
+		System.out.println("Crates positioned on terrain successfully");
+	}
+
+	// needed for actions
+	public void setQKeyHeld(boolean held) {
+		qKeyHeld = held;
+	}
+
+	public void setFKeyHeld(boolean held) {
+		fKeyHeld = held;
 	}
 }
