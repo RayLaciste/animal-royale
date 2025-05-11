@@ -89,18 +89,34 @@ public class MyGame extends VariableFrameRateGame {
 		return npcTex;
 	}
 
+	// crates
+	private ObjShape crateS;
+	private TextureImage crateTx;
+	private GameObject crate1, crate2, crate3, crate4;
+
 	// physics
 	private PhysicsEngine physicsEngine;
 	private boolean running = true;
 	private float vals[] = new float[16];
 	private boolean showPhysicsWorld = false;
 
-	// Throwable sphere
+	// Throwables
 	private GameObject sphere;
 	private ObjShape sphereS;
 	private TextureImage sphereTx;
 	private PhysicsObject sphereP;
 	private boolean sphereCreated = false;
+
+	private int projectileAmmo = 3; // starting ammo
+	private final int MAX_AMMO = 3;
+	private boolean isReloading = false;
+	private long reloadStartTime = 0;
+	private final long RELOAD_TIME = 2000; // 2 seconds to reload
+	private GameObject nearestCrate = null;
+	private float crateInteractionDistance = 3.0f;
+	private boolean fKeyHeld = false;
+	private int screenWidth = 1900;
+	private int screenHeight = 1000;
 
 	// player stuff
 	private int playerHealth = 3; // Start with 3 health
@@ -263,6 +279,9 @@ public class MyGame extends VariableFrameRateGame {
 		// sword
 		swordS = new ImportedModel("sword.obj");
 
+		// crates
+		crateS = new ImportedModel("crate.obj");
+
 		linxS = new Line(new Vector3f(0f, 0f, 0f), new Vector3f(3f, 0f, 0f));
 		linyS = new Line(new Vector3f(0f, 0f, 0f), new Vector3f(0f, 3f, 0f));
 		linzS = new Line(new Vector3f(0f, 0f, 0f), new Vector3f(0f, 0f, -3f));
@@ -279,6 +298,7 @@ public class MyGame extends VariableFrameRateGame {
 		swordTx = new TextureImage("metal.jpg"); // ! change ?
 		frogTx = new TextureImage("frog.png");
 		bearTx = new TextureImage("bear.png");
+		crateTx = new TextureImage("crate.png");
 
 		ghostT = new TextureImage("water.jpg"); // default
 		avatarTx = playerTexture.equals("frog.png") ? frogTx : bearTx;
@@ -294,6 +314,7 @@ public class MyGame extends VariableFrameRateGame {
 	@Override
 	public void buildObjects() {
 		Matrix4f initialTranslation, initialRotation, initialScale;
+		float quadrantSize = 10.0f;
 
 		// build dolphin avatar
 		// avatar = new GameObject(GameObject.root(), dolS, doltx);
@@ -382,6 +403,23 @@ public class MyGame extends VariableFrameRateGame {
 		terr.getRenderStates().setTiling(1);
 		terr.getRenderStates().setTileFactor(10);
 
+		// crates
+		crate1 = new GameObject(GameObject.root(), crateS, crateTx);
+		crate1.setLocalTranslation(new Matrix4f().translation(quadrantSize / 2, 0.5f, -quadrantSize / 2));
+		crate1.setLocalScale(new Matrix4f().scaling(0.5f));
+
+		crate2 = new GameObject(GameObject.root(), crateS, crateTx);
+		crate2.setLocalTranslation(new Matrix4f().translation(-quadrantSize / 2, 0.5f, -quadrantSize / 2));
+		crate2.setLocalScale(new Matrix4f().scaling(0.5f));
+
+		crate3 = new GameObject(GameObject.root(), crateS, crateTx);
+		crate3.setLocalTranslation(new Matrix4f().translation(-quadrantSize / 2, 0.5f, quadrantSize / 2));
+		crate3.setLocalScale(new Matrix4f().scaling(0.5f));
+
+		crate4 = new GameObject(GameObject.root(), crateS, crateTx);
+		crate4.setLocalTranslation(new Matrix4f().translation(quadrantSize / 2, 0.5f, quadrantSize / 2));
+		crate4.setLocalScale(new Matrix4f().scaling(0.5f));
+
 		// add X,Y,-Z axes
 		x = new GameObject(GameObject.root(), linxS);
 		y = new GameObject(GameObject.root(), linyS);
@@ -426,6 +464,20 @@ public class MyGame extends VariableFrameRateGame {
 		// Enable physics world rendering for debugging
 		engine.enableGraphicsWorldRender();
 
+		// ----------------- Positioning ----------------
+		Vector3f initialPosition;
+		Matrix4f initialRotation = new Matrix4f();
+
+		if (playerTexture.equals("frog.png")) {
+			initialPosition = new Vector3f(8.0f, frogHeightAdjust, 0.0f);
+			initialRotation.identity().rotationY((float) java.lang.Math.toRadians(270.0f));
+		} else {
+			initialPosition = new Vector3f(-8.0f, frogHeightAdjust, 0.0f);
+			initialRotation.identity().rotationY((float) java.lang.Math.toRadians(90.0f));
+		}
+		avatar.setLocalTranslation(new Matrix4f().translation(initialPosition));
+		avatar.setLocalRotation(initialRotation);
+
 		// ----------------- INPUTS SECTION -----------------------------
 		im = engine.getInputManager();
 
@@ -466,7 +518,7 @@ public class MyGame extends VariableFrameRateGame {
 	@Override
 	public void update() {
 		updateHUDDisplays();
-
+		updateProjectileAmmo();
 		// ^ =============== animations ===============
 		frogS.updateAnimation();
 
@@ -618,7 +670,7 @@ public class MyGame extends VariableFrameRateGame {
 
 		// HUD1 - Health display
 		String healthStr = "Health: " + playerHealth;
-		Vector3f healthColor = new Vector3f(1, 0, 0); // Red color for health
+		Vector3f healthColor = new Vector3f(1, 0, 0);
 		(engine.getHUDmanager()).setHUD1(healthStr, healthColor, 15, 15);
 
 		// HUD2 - Ball throw cooldown
@@ -655,7 +707,16 @@ public class MyGame extends VariableFrameRateGame {
 		}
 		(engine.getHUDmanager()).setHUD3(shieldStatus, shieldColor, 15, 65);
 
-		// HUD4 - Attack status
+		// HUD4 - Attacks
+		StringBuilder ammoStr = new StringBuilder("Ammo: ");
+		for (int i = 0; i < MAX_AMMO; i++) {
+			if (i < projectileAmmo) {
+				ammoStr.append("O ");
+			} else {
+				ammoStr.append("X ");
+			}
+		}
+
 		String attackStatus;
 		Vector3f attackColor;
 
@@ -671,6 +732,35 @@ public class MyGame extends VariableFrameRateGame {
 			attackColor = new Vector3f(0.0f, 1.0f, 0.0f); // Green for ready
 		}
 		(engine.getHUDmanager()).setHUD4(attackStatus, attackColor, 15, 90);
+
+		String hud4Text = attackStatus + " | " + ammoStr.toString();
+		Vector3f hud4Color = new Vector3f(0.2f, 0.7f, 1.0f);
+		(engine.getHUDmanager()).setHUD4(hud4Text, hud4Color, 15, 90);
+
+		if (isReloading) {
+			long timeRemaining = RELOAD_TIME - (System.currentTimeMillis() - reloadStartTime);
+			float percentComplete = 1.0f - (timeRemaining / (float) RELOAD_TIME);
+
+			StringBuilder reloadBar = new StringBuilder("RELOADING: [");
+			int barLength = 20;
+			int completedSegments = (int) (barLength * percentComplete);
+
+			for (int i = 0; i < barLength; i++) {
+				if (i < completedSegments) {
+					reloadBar.append("O");
+				} else {
+					reloadBar.append("o");
+				}
+			}
+			reloadBar.append("]");
+
+			// Position in center of screen
+			int centerX = screenWidth / 2 - 150;
+			int centerY = screenHeight / 2;
+
+			Vector3f reloadColor = new Vector3f(1.0f, 0.8f, 0.2f);
+			(engine.getHUDmanager()).setHUD4(reloadBar.toString(), reloadColor, centerX, centerY);
+		}
 	}
 
 	private void positionCameraBehindAvatar() {
@@ -701,6 +791,10 @@ public class MyGame extends VariableFrameRateGame {
 			case KeyEvent.VK_W: {
 				frogS.stopAnimation();
 				frogS.playAnimation("RUN", 0.5f, AnimatedShape.EndType.LOOP, 0);
+				break;
+			}
+			case KeyEvent.VK_F: {
+				fKeyHeld = true;
 				break;
 			}
 			case KeyEvent.VK_H: {
@@ -773,12 +867,32 @@ public class MyGame extends VariableFrameRateGame {
 				qKeyHeld = false;
 				break;
 			}
+			case KeyEvent.VK_F: {
+				fKeyHeld = false;
+				break;
+			}
 		}
 		super.keyReleased(e);
 	}
 
 	private void updateSwordAnimation(float elapsedTimeSeconds) {
 		if (swordAnimating) {
+			// Slower speed for wind-up, faster for swing-down
+			float animationSpeed;
+
+			if (swordAnimationProgress < 0.3f) {
+				animationSpeed = SWORD_ANIMATION_SPEED * 0.5f;
+			} else if (swordAnimationProgress < 0.6f) {
+				animationSpeed = SWORD_ANIMATION_SPEED * 1.0f;
+
+				if (!hitboxActive && swordAnimationProgress >= 0.4f && swordAnimationProgress <= 0.55f) {
+					hitboxActive = true;
+					hitboxActivationTime = System.currentTimeMillis();
+				}
+			} else {
+				animationSpeed = SWORD_ANIMATION_SPEED;
+			}
+
 			// Update animation progress
 			swordAnimationProgress += SWORD_ANIMATION_SPEED * elapsedTimeSeconds;
 
@@ -1019,6 +1133,13 @@ public class MyGame extends VariableFrameRateGame {
 	private final long BALL_THROW_COOLDOWN = 3000; // 3 seconds
 
 	private void createThrowableSphere() {
+		if (projectileAmmo <= 0) {
+			System.out.println("Out of ammo! Find a crate to reload (F key).");
+			return;
+		}
+
+		projectileAmmo--;
+
 		if (sphereCreated) {
 			// If a sphere already exists, remove it from the scene graph and physics engine
 			if (sphere.getPhysicsObject() != null) {
@@ -1150,6 +1271,47 @@ public class MyGame extends VariableFrameRateGame {
 				removeSphere();
 			}
 		}
+	}
+
+	private void updateProjectileAmmo() {
+		nearestCrate = findNearestCrate();
+
+		// Handle reloading
+		if (fKeyHeld && nearestCrate != null && projectileAmmo < MAX_AMMO) {
+			if (!isReloading) {
+				isReloading = true;
+				reloadStartTime = System.currentTimeMillis();
+			} else {
+				// Check if reload time has passed
+				if (System.currentTimeMillis() - reloadStartTime >= RELOAD_TIME) {
+					// Reload complete
+					projectileAmmo++;
+					isReloading = false;
+					System.out.println("Reloaded! Ammo: " + projectileAmmo);
+				}
+			}
+		} else {
+			isReloading = false;
+		}
+	}
+
+	private GameObject findNearestCrate() {
+		Vector3f playerPos = avatar.getWorldLocation();
+		GameObject[] crates = { crate1, crate2, crate3, crate4 };
+		GameObject nearest = null;
+		float closestDistance = crateInteractionDistance;
+
+		for (GameObject crate : crates) {
+			if (crate != null) {
+				float distance = playerPos.distance(crate.getWorldLocation());
+				if (distance < closestDistance) {
+					closestDistance = distance;
+					nearest = crate;
+				}
+			}
+		}
+
+		return nearest;
 	}
 	// ---------- PHYSICS UTILITY METHODS ----------------
 

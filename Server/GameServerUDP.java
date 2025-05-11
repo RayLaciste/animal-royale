@@ -12,17 +12,18 @@ public class GameServerUDP extends GameConnectionServer<UUID> {
 	@Override
 	public void processPacket(Object o, InetAddress senderIP, int senderPort) {
 		String message = (String) o;
-		String[] messageTokens = message.split(",");
 
 		if (o == null) {
 			System.out.println("Warning: Received null packet - ignoring");
-			return; // Exit early if the object is null
+			return;
 		}
 
 		if (message == null || message.trim().isEmpty()) {
 			System.out.println("Warning: Received empty message - ignoring");
 			return;
 		}
+
+		String[] messageTokens = message.split(",");
 
 		if (messageTokens.length > 0) { // JOIN -- Case where client just joined the server
 										// Received Message Format: (join,localId)

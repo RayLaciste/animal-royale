@@ -32,12 +32,18 @@ public class ProtocolClient extends GameConnectionClient {
 	protected void processPacket(Object message) {
 		String strMessage = (String) message;
 		System.out.println("message received -->" + strMessage);
-		String[] messageTokens = strMessage.split(",");
 
 		if (strMessage == null || strMessage.trim().isEmpty()) {
 			System.out.println("Warning: Received empty message in processPacket - ignoring");
 			return;
 		}
+
+		if (strMessage.trim().isEmpty()) {
+			System.out.println("Warning: Received empty message in processPacket");
+			return;
+		}
+
+		String[] messageTokens = strMessage.split(",");
 
 		// Game specific protocol to handle the message
 		if (messageTokens.length > 0) {

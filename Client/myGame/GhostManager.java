@@ -12,6 +12,8 @@ import tage.*;
 
 public class GhostManager {
 	private MyGame game;
+	Matrix4f ghostRotation;
+
 	private Vector<GhostAvatar> ghostAvatars = new Vector<GhostAvatar>();
 	private Vector<GhostBall> ghostBalls = new Vector<GhostBall>();
 
@@ -75,8 +77,9 @@ public class GhostManager {
 	}
 
 	public void createGhostAvatar(UUID id, Vector3f position, String textureName) throws IOException {
-
 		GhostAvatar existingAvatar = findAvatar(id);
+		Matrix4f ghostRotation = new Matrix4f();
+
 		if (existingAvatar != null) {
 			System.out
 					.println("Avatar with ID " + id + " already exists, updating position instead of creating new one");
@@ -94,6 +97,16 @@ public class GhostManager {
 			t = game.getFrogTexture(); // frog.png
 		}
 
+		if (textureName.equals("bear.png")) {
+			float zPos = position.z();
+			position = new Vector3f(-8.0f, position.y(), zPos);
+			ghostRotation.identity().rotationY((float) java.lang.Math.toRadians(90.0f));
+		} else {
+			float zPos = position.z();
+			position = new Vector3f(8.0f, position.y(), zPos);
+			ghostRotation.identity().rotationY((float) java.lang.Math.toRadians(270.0f));
+		}
+
 		GhostAvatar newAvatar = new GhostAvatar(id, s, t, position);
 
 		Matrix4f initialScale = (new Matrix4f()).scaling(0.20f);
@@ -108,6 +121,8 @@ public class GhostManager {
 		newAvatar.createShield(game.getShieldShape(), game.getShieldTexture());
 		newAvatar.createSword(game.getSwordShape(), game.getSwordTexture());
 
+		newAvatar.setLocalRotation(ghostRotation);
+		newAvatar.setPosition(position);
 		ghostAvatars.add(newAvatar);
 	}
 
