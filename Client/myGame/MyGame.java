@@ -47,7 +47,7 @@ public class MyGame extends VariableFrameRateGame {
 	private GameObject tor, avatar, x, y, z;
 	private ObjShape torS, ghostS, dolS, linxS, linyS, linzS;
 	private TextureImage doltx, ghostT, metalTx;
-	private Light light;
+	private Light light, redLight, redLight1, redLight2, redLight3;
 
 	private AnimatedShape frogS;
 	private TextureImage frogTx, bearTx;
@@ -122,8 +122,8 @@ public class MyGame extends VariableFrameRateGame {
 	private boolean isDashing = false;
 	private long dashStartTime = 0;
 	private final long DASH_DURATION = 200; // 0.2 seconds for the dash
-	private final float DASH_DISTANCE = 5.0f; // Total distance of the dash
-	private final long DASH_COOLDOWN = 1500; // 1.5 seconds cooldown
+	private final float DASH_DISTANCE = 3.5f; // Total distance of the dash
+	private final long DASH_COOLDOWN = 3000; // 1.5 seconds cooldown
 	private long lastDashTime = 0;
 	private Vector3f dashDirection = new Vector3f(0, 0, 0);
 	private Vector3f dashStartPosition = new Vector3f();
@@ -310,7 +310,7 @@ public class MyGame extends VariableFrameRateGame {
 		heightMapTx = new TextureImage("terrain.png");
 		sphereTx = new TextureImage("water.jpg");
 		metalTx = new TextureImage("metal.jpg");
-		shieldTx = new TextureImage("shield.png");
+		shieldTx = new TextureImage("metal.png");
 		swordTx = new TextureImage("metal.jpg"); // ! change ?
 		frogTx = new TextureImage("frog.png");
 		bearTx = new TextureImage("bear.png");
@@ -452,6 +452,39 @@ public class MyGame extends VariableFrameRateGame {
 		light = new Light();
 		light.setLocation(new Vector3f(0f, 5f, 0f));
 		(engine.getSceneGraph()).addLight(light);
+		
+
+		redLight = new Light();
+		redLight.setType(Light.LightType.SPOTLIGHT);
+		redLight.setAmbient(1.0f, 0.0f, 0.0f);
+		redLight.setDiffuse(1.0f, 0.0f, 0.0f);
+		redLight.setSpecular(1.0f, 0.0f, 0.0f);
+		redLight.setLocation(crate1.getWorldLocation().add(crate1.getLocalUpVector().mul(1.5f)));
+		(engine.getSceneGraph()).addLight(redLight);
+
+		redLight1 = new Light();
+		redLight1.setType(Light.LightType.SPOTLIGHT);
+		redLight1.setAmbient(1.0f, 0.0f, 0.0f);
+		redLight1.setDiffuse(1.0f, 0.0f, 0.0f);
+		redLight1.setSpecular(1.0f, 0.0f, 0.0f);
+		redLight1.setLocation(crate2.getWorldLocation().add(crate2.getLocalUpVector().mul(1.5f)));
+		(engine.getSceneGraph()).addLight(redLight1);
+
+		redLight2 = new Light();
+		redLight2.setType(Light.LightType.SPOTLIGHT);
+		redLight2.setAmbient(1.0f, 0.0f, 0.0f);
+		redLight2.setDiffuse(1.0f, 0.0f, 0.0f);
+		redLight2.setSpecular(1.0f, 0.0f, 0.0f);
+		redLight2.setLocation(crate3.getWorldLocation().add(crate3.getLocalUpVector().mul(1.5f)));
+		(engine.getSceneGraph()).addLight(redLight2);
+
+		redLight3 = new Light();
+		redLight3.setType(Light.LightType.SPOTLIGHT);
+		redLight3.setAmbient(1.0f, 0.0f, 0.0f);
+		redLight3.setDiffuse(1.0f, 0.0f, 0.0f);
+		redLight3.setSpecular(1.0f, 0.0f, 0.0f);
+		redLight3.setLocation(crate4.getWorldLocation().add(crate4.getLocalUpVector().mul(1.5f)));
+		(engine.getSceneGraph()).addLight(redLight3);
 	}
 
 	@Override
@@ -501,6 +534,7 @@ public class MyGame extends VariableFrameRateGame {
 		FwdAction fwdAction = new FwdAction(this, protClient);
 		TurnAction turnAction = new TurnAction(this, protClient);
 		BackwardAction backwardAction = new BackwardAction(this, protClient);
+		StrafeAction strafeAction = new StrafeAction(this, protClient);
 		jumpAction = new JumpAction(this, protClient);
 
 		// attach the action objects to keyboard and gamepad components
@@ -514,13 +548,19 @@ public class MyGame extends VariableFrameRateGame {
 				net.java.games.input.Component.Identifier.Key.W,
 				fwdAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 		im.associateActionWithAllKeyboards(
-				net.java.games.input.Component.Identifier.Key.A,
-				turnAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
-		im.associateActionWithAllKeyboards(
 				net.java.games.input.Component.Identifier.Key.S,
 				backwardAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 		im.associateActionWithAllKeyboards(
+				net.java.games.input.Component.Identifier.Key.A,
+				strafeAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+		im.associateActionWithAllKeyboards(
 				net.java.games.input.Component.Identifier.Key.D,
+				strafeAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+		im.associateActionWithAllKeyboards(
+				net.java.games.input.Component.Identifier.Key.LEFT,
+				turnAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
+		im.associateActionWithAllKeyboards(
+				net.java.games.input.Component.Identifier.Key.RIGHT,
 				turnAction, InputManager.INPUT_ACTION_TYPE.REPEAT_WHILE_DOWN);
 		im.associateActionWithAllKeyboards(
 				net.java.games.input.Component.Identifier.Key.SPACE,
@@ -944,34 +984,35 @@ public class MyGame extends VariableFrameRateGame {
 		forwardDir.mul(avatar.getWorldRotation());
 		Vector3f forward = new Vector3f(forwardDir.x(), 0, forwardDir.z()).normalize();
 
-		Vector3f right = new Vector3f(forward.z(), 0, -forward.x()).normalize();
+		Vector3f right = new Vector3f(forward.z(), 0, forward.x()).normalize();
 
-		dashDirection = new Vector3f(forward);
+		dashDirection = new Vector3f(0, 0, 0);
+		boolean keyPressed = false;
 
-		if (wKeyHeld && !sKeyHeld) {
-			// Forward
-			dashDirection = new Vector3f(forward);
-		} else if (sKeyHeld && !wKeyHeld) {
-			// Backward
-			dashDirection = new Vector3f(forward).negate();
+		if (wKeyHeld) {
+			dashDirection.add(forward);
+			keyPressed = true;
 		}
 
-		if (dKeyHeld && !dKeyHeld) {
-			// Left
-			if (!wKeyHeld && !sKeyHeld) {
-				dashDirection = new Vector3f(right).negate();
-			} else {
-				dashDirection.add(new Vector3f(right).negate());
-				dashDirection.normalize();
-			}
-		} else if (aKeyHeld && !aKeyHeld) {
-			// Right
-			if (!wKeyHeld && !sKeyHeld) {
-				dashDirection = new Vector3f(right);
-			} else {
-				dashDirection.add(new Vector3f(right));
-				dashDirection.normalize();
-			}
+		if (sKeyHeld) {
+			dashDirection.add(new Vector3f(forward).negate());
+			keyPressed = true;
+		}
+
+		if (aKeyHeld) {
+			dashDirection.add(new Vector3f(right).negate());
+			keyPressed = true;
+		}
+
+		if (dKeyHeld) {
+			dashDirection.add(right);
+			keyPressed = true;
+		}
+
+		if (!keyPressed) {
+			dashDirection = new Vector3f(forward).negate();
+		} else {
+			dashDirection.normalize();
 		}
 
 		dashStartPosition = new Vector3f(avatar.getWorldLocation());

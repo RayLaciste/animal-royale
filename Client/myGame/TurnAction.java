@@ -23,7 +23,7 @@ public class TurnAction extends AbstractInputAction {
 		if (keyValue > -.2 && keyValue < .2)
 			return; // deadzone
 		float direction = (e.getComponent().getIdentifier()
-				.getName() == "A") ? -1.0f : 1.0f;
+				.getName() == "Left") ? -1.0f : 1.0f;
 
 		av = game.getAvatar();
 		oldRotation = new Matrix4f(av.getWorldRotation());
