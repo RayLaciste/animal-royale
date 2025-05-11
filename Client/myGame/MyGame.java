@@ -118,6 +118,22 @@ public class MyGame extends VariableFrameRateGame {
 	private int screenWidth = 1900;
 	private int screenHeight = 1000;
 
+	// Dodge
+	private boolean isDashing = false;
+	private long dashStartTime = 0;
+	private final long DASH_DURATION = 200; // 0.2 seconds for the dash
+	private final float DASH_DISTANCE = 5.0f; // Total distance of the dash
+	private final long DASH_COOLDOWN = 1500; // 1.5 seconds cooldown
+	private long lastDashTime = 0;
+	private Vector3f dashDirection = new Vector3f(0, 0, 0);
+	private Vector3f dashStartPosition = new Vector3f();
+	private Vector3f dashEndPosition = new Vector3f();
+
+	private boolean wKeyHeld = false;
+	private boolean aKeyHeld = false;
+	private boolean sKeyHeld = false;
+	private boolean dKeyHeld = false;
+
 	// player stuff
 	private int playerHealth = 3; // Start with 3 health
 	private boolean isInvulnerable = false;
@@ -519,6 +535,7 @@ public class MyGame extends VariableFrameRateGame {
 	public void update() {
 		updateHUDDisplays();
 		updateProjectileAmmo();
+		updateDash((float) elapsedTime / 1000.0f);
 		// ^ =============== animations ===============
 		frogS.updateAnimation();
 
@@ -785,12 +802,33 @@ public class MyGame extends VariableFrameRateGame {
 	public void keyPressed(KeyEvent e) {
 		switch (e.getKeyCode()) {
 			case KeyEvent.VK_Q: {
-				qKeyHeld = true;
+				if (!isDashing) {
+					qKeyHeld = true;
+				}
+				break;
+			}
+			case KeyEvent.VK_ALT: {
+				if (!isDashing) {
+					startDash();
+				}
 				break;
 			}
 			case KeyEvent.VK_W: {
+				wKeyHeld = true;
 				frogS.stopAnimation();
 				frogS.playAnimation("RUN", 0.5f, AnimatedShape.EndType.LOOP, 0);
+				break;
+			}
+			case KeyEvent.VK_A: {
+				aKeyHeld = true;
+				break;
+			}
+			case KeyEvent.VK_S: {
+				sKeyHeld = true;
+				break;
+			}
+			case KeyEvent.VK_D: {
+				dKeyHeld = true;
 				break;
 			}
 			case KeyEvent.VK_F: {
@@ -804,7 +842,7 @@ public class MyGame extends VariableFrameRateGame {
 			}
 			case KeyEvent.VK_R: {
 				// Don't allow throwing balls while shield is up
-				if (!qKeyHeld && !shieldActive) {
+				if (!isDashing && !qKeyHeld && !shieldActive) {
 					long currentTime = System.currentTimeMillis();
 					// Check if cooldown has passed
 					if (currentTime - lastBallThrowTime > BALL_THROW_COOLDOWN) {
@@ -827,7 +865,7 @@ public class MyGame extends VariableFrameRateGame {
 			}
 			case KeyEvent.VK_E: {
 				// Don't allow hitbox activation while shield is up
-				if (!qKeyHeld && !shieldActive) {
+				if (!isDashing && !qKeyHeld && !shieldActive) {
 					activateHitbox();
 				} else {
 					System.out.println("Cannot use hitbox while shield is active!");
@@ -860,7 +898,20 @@ public class MyGame extends VariableFrameRateGame {
 	public void keyReleased(KeyEvent e) {
 		switch (e.getKeyCode()) {
 			case KeyEvent.VK_W: {
+				wKeyHeld = false;
 				frogS.stopAnimation();
+				break;
+			}
+			case KeyEvent.VK_A: {
+				aKeyHeld = false;
+				break;
+			}
+			case KeyEvent.VK_S: {
+				sKeyHeld = false;
+				break;
+			}
+			case KeyEvent.VK_D: {
+				dKeyHeld = false;
 				break;
 			}
 			case KeyEvent.VK_Q: {
@@ -875,6 +926,115 @@ public class MyGame extends VariableFrameRateGame {
 		super.keyReleased(e);
 	}
 
+	// * ---------- DASH SECTION ----------------
+	private void startDash() {
+		if (isDashing) {
+			return;
+		}
+
+		long currentTime = System.currentTimeMillis();
+		if (currentTime - lastDashTime < DASH_COOLDOWN) {
+			float cooldownRemaining = (DASH_COOLDOWN - (currentTime - lastDashTime)) / 1000.0f;
+			System.out.println("Dash on cooldown! Ready in " + String.format("%.1f", cooldownRemaining) + " seconds");
+			return;
+		}
+
+		// Default dash direction
+		Vector4f forwardDir = new Vector4f(0f, 0f, 1f, 1f);
+		forwardDir.mul(avatar.getWorldRotation());
+		Vector3f forward = new Vector3f(forwardDir.x(), 0, forwardDir.z()).normalize();
+
+		Vector3f right = new Vector3f(forward.z(), 0, -forward.x()).normalize();
+
+		dashDirection = new Vector3f(forward);
+
+		if (wKeyHeld && !sKeyHeld) {
+			// Forward
+			dashDirection = new Vector3f(forward);
+		} else if (sKeyHeld && !wKeyHeld) {
+			// Backward
+			dashDirection = new Vector3f(forward).negate();
+		}
+
+		if (dKeyHeld && !dKeyHeld) {
+			// Left
+			if (!wKeyHeld && !sKeyHeld) {
+				dashDirection = new Vector3f(right).negate();
+			} else {
+				dashDirection.add(new Vector3f(right).negate());
+				dashDirection.normalize();
+			}
+		} else if (aKeyHeld && !aKeyHeld) {
+			// Right
+			if (!wKeyHeld && !sKeyHeld) {
+				dashDirection = new Vector3f(right);
+			} else {
+				dashDirection.add(new Vector3f(right));
+				dashDirection.normalize();
+			}
+		}
+
+		dashStartPosition = new Vector3f(avatar.getWorldLocation());
+
+		dashEndPosition = new Vector3f(
+				dashStartPosition.x() + dashDirection.x() * DASH_DISTANCE,
+				dashStartPosition.y(),
+				dashStartPosition.z() + dashDirection.z() * DASH_DISTANCE);
+
+		isDashing = true;
+		dashStartTime = currentTime;
+		lastDashTime = currentTime;
+
+		// Put attacks on cooldown
+		lastAttackTime = currentTime;
+		lastBallThrowTime = currentTime;
+
+		if (shieldActive) {
+			deactivateShield();
+		}
+	}
+
+	private void updateDash(float elapsedTime) {
+		if (!isDashing)
+			return;
+
+		long currentTime = System.currentTimeMillis();
+		long dashElapsedTime = currentTime - dashStartTime;
+
+		if (dashElapsedTime >= DASH_DURATION) {
+			isDashing = false;
+			return;
+		}
+
+		float dashProgress = (float) dashElapsedTime / DASH_DURATION;
+
+		Vector3f newPosition = new Vector3f();
+		newPosition.x = dashStartPosition.x() + (dashEndPosition.x() - dashStartPosition.x()) * dashProgress;
+		newPosition.y = dashStartPosition.y(); // Keep y-coordinate the same
+		newPosition.z = dashStartPosition.z() + (dashEndPosition.z() - dashStartPosition.z()) * dashProgress;
+
+		float height = terr.getHeight(newPosition.x(), newPosition.z());
+		newPosition.y = height + frogHeightAdjust;
+
+		avatar.setLocalLocation(newPosition);
+
+		// Make player invulnerable during dash
+		isInvulnerable = true;
+		invulnerabilityStartTime = currentTime;
+	}
+
+	private void faceDirection(Vector3f direction) {
+		if (direction.length() < 0.1f)
+			return;
+
+		float angle = (float) Math.atan2(direction.x(), direction.z());
+
+		Matrix4f newRotation = new Matrix4f().identity().rotationY(angle);
+
+		avatar.setLocalRotation(newRotation);
+	}
+
+	// * ---------- SWORD SECTION ----------------
 	private void updateSwordAnimation(float elapsedTimeSeconds) {
 		if (swordAnimating) {
 			// Slower speed for wind-up, faster for swing-down
@@ -908,7 +1068,6 @@ public class MyGame extends VariableFrameRateGame {
 				// Reset to original rotation
 				sword.setLocalRotation(new Matrix4f().rotationY((float) Math.toRadians(-90.0f)));
 			} else {
-				// Simple swing down and up animation
 				// For the first half, swing down
 				// For the second half, swing back up
 				float angle;
