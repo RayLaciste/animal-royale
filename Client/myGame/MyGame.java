@@ -205,6 +205,8 @@ public class MyGame extends VariableFrameRateGame {
 	private IAudioManager audioMgr;
 	private Sound blockSound;
 	private Sound slapSound, oofSound, musicSound;
+	private Sound footstepSound;
+	private boolean isWalking = false;
 
 	public MyGame(String serverAddress, int serverPort, String protocol, String playerTexture) {
 		super();
@@ -232,7 +234,7 @@ public class MyGame extends VariableFrameRateGame {
 	}
 
 	public void loadSounds() {
-		AudioResource blockResource, slapResource, oofResource, musicResource;
+		AudioResource blockResource, slapResource, oofResource, musicResource, footstepResource;
 		audioMgr = engine.getAudioManager();
 
 		musicResource = audioMgr.createAudioResource("music.wav", AudioResourceType.AUDIO_SAMPLE);
@@ -263,13 +265,20 @@ public class MyGame extends VariableFrameRateGame {
 		oofSound.setMaxDistance(10.0f);
 		oofSound.setMinDistance(0.5f);
 		oofSound.setRollOff(5.0f);
+
+		footstepResource = audioMgr.createAudioResource("pmpt.wav", AudioResourceType.AUDIO_SAMPLE);
+		footstepSound = new Sound(footstepResource, SoundType.SOUND_EFFECT, 25, true);
+		footstepSound.initialize(audioMgr);
+
+		footstepSound.setMaxDistance(5.0f);
+		footstepSound.setMinDistance(0.2f);
+		footstepSound.setRollOff(5.0f);
+
 	}
 
 	@Override
 	public void loadShapes() {
 		torS = new Torus(0.5f, 0.2f, 48);
-
-		dolS = new ImportedModel("dolphinHighPoly.obj");
 
 		frogS = new AnimatedShape("frog.rkm", "frog.rks");
 		frogS.loadAnimation("RUN", "run.rka");
@@ -286,7 +295,7 @@ public class MyGame extends VariableFrameRateGame {
 		npcShape = new ImportedModel("frog.obj");
 
 		// sphere (throwable)
-		sphereS = new Sphere();
+		sphereS = new ImportedModel("axe.obj");
 
 		// shield
 		shieldS = new ImportedModel("shield.obj");
@@ -303,7 +312,7 @@ public class MyGame extends VariableFrameRateGame {
 		groundTx = new TextureImage("grass.png");
 		npcTex = new TextureImage("frog.png");
 		heightMapTx = new TextureImage("terrain.png");
-		sphereTx = new TextureImage("water.jpg");
+		sphereTx = new TextureImage("metal.jpg");
 		metalTx = new TextureImage("metal.jpg");
 		shieldTx = new TextureImage("metal.jpg");
 		swordTx = new TextureImage("metal.jpg"); // ! change ?
@@ -317,7 +326,7 @@ public class MyGame extends VariableFrameRateGame {
 
 	@Override
 	public void loadSkyBoxes() {
-		flufflyClouds = (engine.getSceneGraph()).loadCubeMap("fluffyClouds");
+		flufflyClouds = (engine.getSceneGraph()).loadCubeMap("lakeIslands");
 		(engine.getSceneGraph()).setActiveSkyBoxTexture(flufflyClouds);
 		(engine.getSceneGraph()).setSkyBoxEnabled(true);
 	}
@@ -730,7 +739,10 @@ public class MyGame extends VariableFrameRateGame {
 
 		// ^ =============== Audio ===============
 		setEarParameters();
-
+		
+		if (isWalking) {
+			footstepSound.setLocation(avatar.getWorldLocation());
+		}
 		// ^ =============== Position Updates ===============
 		Vector3f loc = avatar.getWorldLocation();
 		float height = terr.getHeight(loc.x(), loc.z());
@@ -881,6 +893,11 @@ public class MyGame extends VariableFrameRateGame {
 				wKeyHeld = true;
 				frogS.stopAnimation();
 				frogS.playAnimation("RUN", 0.5f, AnimatedShape.EndType.LOOP, 0);
+
+				if (!isWalking) {
+					footstepSound.play();
+					isWalking = true;
+				}
 				break;
 			}
 			case KeyEvent.VK_A: {
@@ -936,24 +953,6 @@ public class MyGame extends VariableFrameRateGame {
 				}
 				break;
 			}
-			case KeyEvent.VK_T: {
-				// Toggle physics world rendering
-				showPhysicsWorld = !showPhysicsWorld;
-				if (showPhysicsWorld) {
-					engine.enablePhysicsWorldRender();
-					System.out.println("showing physics world");
-				} else {
-					engine.disablePhysicsWorldRender();
-					System.out.println("hiding physics world");
-				}
-				break;
-			}
-
-			case KeyEvent.VK_U: {
-				blockSound.stop();
-				blockSound.play();
-				break;
-			}
 		}
 		super.keyPressed(e);
 	}
@@ -964,6 +963,11 @@ public class MyGame extends VariableFrameRateGame {
 			case KeyEvent.VK_W: {
 				wKeyHeld = false;
 				frogS.stopAnimation();
+
+				if (isWalking) {
+					footstepSound.stop();
+					isWalking = false;
+				}
 				break;
 			}
 			case KeyEvent.VK_A: {
