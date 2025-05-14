@@ -140,13 +140,15 @@ public class MyGame extends VariableFrameRateGame {
 	private final long INVULNERABILITY_DURATION = 1000;
 	private boolean byeMessageSent = false;
 
-	public ObjShape getSphereShape() {
-		return sphereS;
-	}
+	// shield stuff
+	private boolean isShielding = false;
+	private boolean shieldOnCooldown = false;
+	private long shieldCooldownStartTime = 0;
+	private final long SHIELD_COOLDOWN_DURATION = 1500;
 
-	public TextureImage getSphereTexture() {
-		return sphereTx;
-	}
+	// sounds
+	private IAudioManager audioMgr;
+	private Sound blockSound;
 
 	private String serverAddress;
 	private int serverPort;
@@ -959,6 +961,32 @@ public class MyGame extends VariableFrameRateGame {
 
 	@Override
 	public void keyReleased(KeyEvent e) {
+
+	}
+
+	public void toggleShield() {
+		// Only toggle if not on cooldown
+		if (!shieldOnCooldown) {
+			isShielding = !isShielding;
+
+			if (isShielding) {
+				// Shield activated
+				System.out.println("Shield activated!");
+			} else {
+				// Shield deactivated, start cooldown
+				shieldOnCooldown = true;
+				shieldCooldownStartTime = System.currentTimeMillis();
+				System.out.println("Shield deactivated, on cooldown!");
+			}
+		} else {
+			float cooldownRemaining = (SHIELD_COOLDOWN_DURATION
+					- (System.currentTimeMillis() - shieldCooldownStartTime)) / 1000.0f;
+			System.out.println("Shield on cooldown! Ready in " + String.format("%.1f", cooldownRemaining) + " seconds");
+		}
+	}
+
+	@Override
+	public void keyReleased(KeyEvent e) {
 		switch (e.getKeyCode()) {
 			case KeyEvent.VK_W: {
 				wKeyHeld = false;
@@ -1254,8 +1282,6 @@ public class MyGame extends VariableFrameRateGame {
 			System.out.println("Hitbox deactivated");
 		}
 
-		// While the hitbox is active, you can add code here to check for collisions
-		// with other players
 		if (hitboxActive) {
 			checkHitboxCollisions();
 		}
@@ -1355,7 +1381,7 @@ public class MyGame extends VariableFrameRateGame {
 
 	// * ---------- Physics throw SECTION ----------------
 	private long sphereCreationTime = 0;
-	private final long SPHERE_LIFETIME = 2500; // 2.5 seconds
+	private final long SPHERE_LIFETIME = 2000; // 2 seconds
 	private UUID sphereId = null;
 	private long lastBallThrowTime = 0;
 	private final long BALL_THROW_COOLDOWN = 3000; // 3 seconds
@@ -1420,6 +1446,7 @@ public class MyGame extends VariableFrameRateGame {
 
 		// Set up direction with upward component
 		Vector3f tossDir = new Vector3f(fwdDirection.x(), fwdDirection.y(), fwdDirection.z());
+		tossDir.add(0.0f, 0.30f, 0.0f);
 		tossDir.add(0.0f, 0.30f, 0.0f);
 		tossDir.normalize();
 
@@ -1544,12 +1571,11 @@ public class MyGame extends VariableFrameRateGame {
 	// ---------- PHYSICS UTILITY METHODS ----------------
 
 	private void checkPlayerHits() {
-		// Only check for hits if player is not invulnerable
+		// Only check for hits if not invulnerable and ghost manager exists
 		if (!isInvulnerable && gm != null) {
 			Vector3f avatarPos = avatar.getWorldLocation();
 			float avatarRadius = 0.5f; // Approximate size of avatar
 
-			// Get ghost balls (we'll need to add a getGhostBalls method to GhostManager)
 			Vector<GhostBall> ghostBalls = gm.getGhostBalls();
 
 			if (ghostBalls != null) {
@@ -1558,12 +1584,24 @@ public class MyGame extends VariableFrameRateGame {
 						Vector3f ballPos = ghostBall.getWorldLocation();
 						float ballRadius = 0.07f;
 
-						// Simple distance-based collision detection
 						float distance = ballPos.distance(avatarPos);
 
 						if (distance < (ballRadius + avatarRadius)) {
-							// We've been hit!
-							handlePlayerHit(ghostBall.getID(), ghostBall.getOwnerID());
+							// A hit is detected, now check if shield is active
+							if (isShielding) {
+								System.out.println("Shield blocked the hit!");
+
+								// Deactivate shield and start cooldown
+								isShielding = false;
+								shieldOnCooldown = true;
+								shieldCooldownStartTime = System.currentTimeMillis();
+
+								// Remove the ghost ball that hit the shield
+								gm.removeGhostBall(ghostBall.getID());
+							} else {
+								// No shield active, so apply damage
+								handlePlayerHit(ghostBall.getID(), ghostBall.getOwnerID());
+							}
 							break; // Only handle one hit per frame
 						}
 					}
